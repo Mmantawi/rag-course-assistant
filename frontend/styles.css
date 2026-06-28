@@ -1,0 +1,150 @@
+/* Glassmorphism custom card for citations */
+.source-card {
+    background-color: var(--card-bg) !important;
+    border: 1px solid var(--border-color) !important;
+    border-radius: 12px !important;
+    padding: 16px !important;
+    margin-bottom: 12px !important;
+    color: var(--text-primary) !important;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06) !important;
+    transition: all 0.2s ease-in-out !important;
+}
+
+.source-card:hover {
+    transform: translateY(-2px) !important;
+    border-color: var(--accent) !important;
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05) !important;
+}
+
+.source-header {
+    display: flex !important;
+    justify-content: space-between !important;
+    align-items: center !important;
+    margin-bottom: 6px !important;
+}
+
+.source-title {
+    font-size: 14px !important;
+    font-weight: 600 !important;
+    color: var(--accent) !important;
+    word-break: break-all !important;
+}
+
+.source-meta {
+    font-size: 12px !important;
+    color: var(--text-secondary) !important;
+    margin-bottom: 8px !important;
+    display: flex !important;
+    justify-content: space-between !important;
+}
+
+.source-score {
+    font-weight: bold !important;
+    color: #10b981 !important; /* emerald green */
+}
+
+.source-snippet {
+    font-size: 13px !important;
+    line-height: 1.5 !important;
+    color: var(--text-primary) !important;
+    background: var(--bg-secondary) !important;
+    padding: 8px 12px !important;
+    border-radius: 6px !important;
+    font-family: 'Consolas', 'Courier New', monospace !important;
+    white-space: pre-wrap !important;
+    max-height: 150px !important;
+    overflow-y: auto !important;
+    border: 1px solid var(--border-color) !important;
+}
+
+.pdf-link-btn {
+    display: inline-flex !important;
+    align-items: center !important;
+    color: #ffffff !important;
+    background-color: var(--accent) !important;
+    text-decoration: none !important;
+    font-weight: 600 !important;
+    font-size: 12px !important;
+    padding: 6px 12px !important;
+    border-radius: 6px !important;
+    margin-top: 8px !important;
+    transition: background-color 0.2s !important;
+    border: none !important;
+    cursor: pointer !important;
+}
+
+.pdf-link-btn:hover {
+    opacity: 0.9 !important;
+}
+
+/* Sidebar Styling Overrides */
+section[data-testid="stSidebar"] {
+    background-color: var(--bg-secondary) !important;
+    border-right: 1px solid var(--border-color) !important;
+}
+
+/* Document List styling in Sidebar */
+.sidebar-doc-item {
+    font-size: 13px !important;
+    padding: 6px 10px !important;
+    border-radius: 6px !important;
+    background-color: var(--card-bg) !important;
+    border: 1px solid var(--border-color) !important;
+    margin-bottom: 6px !important;
+    color: var(--text-primary) !important;
+    display: flex !important;
+    align-items: center !important;
+    gap: 8px !important;
+    word-break: break-all !important;
+}
+
+/* Chat Input Styling */
+.stChatInput {
+    border-color: var(--border-color) !important;
+}
+
+/* General app backgrounds and fonts override */
+.stApp {
+    background-color: var(--bg-primary) !important;
+    color: var(--text-primary) !important;
+    font-family: 'Inter', 'Outfit', -apple-system, sans-serif !important;
+}
+
+/* Enforce dark text color for markdown paragraphs and labels in Light Mode */
+.stApp p, .stApp span, .stApp label, .stApp li {
+    color: var(--text-primary) !important;
+}
+
+h1, h2, h3, h4, h5, h6 {
+    color: var(--text-primary) !important;
+}
+
+/* Column Panel Header styling */
+.panel-header {
+    font-size: 18px !important;
+    font-weight: bold !important;
+    border-bottom: 2px solid var(--border-color) !important;
+    padding-bottom: 8px !important;
+    margin-bottom: 16px !important;
+    color: var(--text-primary) !important;
+}
+
+/* Active question highlighting with premium pulse animation */
+.active-question-highlight {
+    border: 2px solid var(--accent) !important;
+    border-radius: 12px !important;
+    padding: 10px 14px !important;
+    box-shadow: 0 0 12px var(--accent) !important;
+    animation: active-pulse 2s infinite alternate !important;
+}
+
+@keyframes active-pulse {
+    0% {
+        box-shadow: 0 0 4px var(--accent) !important;
+        opacity: 0.95;
+    }
+    100% {
+        box-shadow: 0 0 16px var(--accent) !important;
+        opacity: 1.0;
+    }
+}

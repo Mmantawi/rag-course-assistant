@@ -1,0 +1,14 @@
+fastapi
+uvicorn
+streamlit
+langchain
+langchain-community
+langchain-ollama
+langchain-google-genai
+langchain-groq
+chromadb
+pymupdf
+python-dotenv
+pydantic
+requests
+tqdm

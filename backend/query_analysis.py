@@ -24,9 +24,22 @@ class QueryAnalyzer:
     while preserving stopwords and acronym capitalization.
     """
     @staticmethod
+    def clean_control_chars(text: str) -> str:
+        """Removes Unicode control, format, and private-use characters except whitespace."""
+        if not text:
+            return ""
+        return "".join(
+            ch for ch in text
+            if not unicodedata.category(ch).startswith("C") or ch in ("\n", "\r", "\t")
+        )
+
+    @staticmethod
     def normalize(query: str) -> str:
         if not query:
             return ""
+        
+        # Clean control characters
+        query = QueryAnalyzer.clean_control_chars(query)
         
         # 1. Unicode normalization (NFKC decomposes compatibility characters)
         normalized = unicodedata.normalize("NFKC", query)
@@ -146,8 +159,9 @@ class MultiRetriever:
             for rank_idx, (doc, score) in enumerate(candidates_vector):
                 chunk_id = doc.metadata.get("chunk_id")
                 if chunk_id not in merged:
-                    # Clone document object to prevent modifying in-place Chroma objects
-                    doc_clone = Document(page_content=doc.page_content, metadata=doc.metadata.copy())
+                    # Clone document object to prevent modifying in-place Chroma objects and clean control chars
+                    cleaned_content = QueryAnalyzer.clean_control_chars(doc.page_content)
+                    doc_clone = Document(page_content=cleaned_content, metadata=doc.metadata.copy())
                     merged[chunk_id] = {
                         "doc": doc_clone,
                         "vector_rank": rank_idx + 1,
@@ -160,7 +174,8 @@ class MultiRetriever:
             for rank_idx, (doc, score) in enumerate(candidates_bm25):
                 chunk_id = doc.metadata.get("chunk_id")
                 if chunk_id not in merged:
-                    doc_clone = Document(page_content=doc.page_content, metadata=doc.metadata.copy())
+                    cleaned_content = QueryAnalyzer.clean_control_chars(doc.page_content)
+                    doc_clone = Document(page_content=cleaned_content, metadata=doc.metadata.copy())
                     merged[chunk_id] = {
                         "doc": doc_clone,
                         "vector_rank": None,

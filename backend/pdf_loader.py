@@ -1,6 +1,16 @@
 import os
 import sys
+import unicodedata
 import fitz  # PyMuPDF
+
+def clean_control_chars(text: str) -> str:
+    """Removes Unicode control, format, and private-use characters except whitespace."""
+    if not text:
+        return ""
+    return "".join(
+        ch for ch in text
+        if not unicodedata.category(ch).startswith("C") or ch in ("\n", "\r", "\t")
+    )
 
 def extract_text_from_pdf(file_path):
     """Extracts all plain text from the specified PDF file page-by-page."""
@@ -13,7 +23,9 @@ def extract_text_from_pdf(file_path):
     for page_num in range(len(doc)):
         page = doc.load_page(page_num)
         page_text = page.get_text()
-        extracted_pages.append(f"--- Page {page_num + 1} ---\n{page_text.strip()}")
+        # Clean control characters before storing
+        cleaned_text = clean_control_chars(page_text)
+        extracted_pages.append(f"--- Page {page_num + 1} ---\n{cleaned_text.strip()}")
         
     doc.close()
     return "\n\n".join(extracted_pages)

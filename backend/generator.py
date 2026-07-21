@@ -33,7 +33,7 @@ def get_llm(model_choice: str):
 
     choice = model_choice.lower() if model_choice else "local"
 
-    if choice == "gemini":
+    if "gemini" in choice:
         api_key = os.getenv("GEMINI_API_KEY") or GEMINI_API_KEY
         if not api_key or not api_key.strip():
             raise ValueError(
@@ -42,7 +42,7 @@ def get_llm(model_choice: str):
         from langchain_google_genai import ChatGoogleGenerativeAI
         return ChatGoogleGenerativeAI(model=GEMINI_MODEL, google_api_key=api_key, temperature=0)
         
-    elif choice == "groq":
+    elif "groq" in choice:
         api_key = os.getenv("GROQ_API_KEY") or GROQ_API_KEY
         if not api_key or not api_key.strip():
             raise ValueError(
@@ -52,7 +52,7 @@ def get_llm(model_choice: str):
         return ChatGroq(model=GROQ_MODEL, groq_api_key=api_key, temperature=0)
         
     else:  # local (Ollama)
-        ollama_model = model_choice if (model_choice and choice != "local") else LLM_MODEL
+        ollama_model = LLM_MODEL
         try:
             from langchain_ollama import ChatOllama
         except ImportError:

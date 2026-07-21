@@ -38,8 +38,12 @@ def embed_and_store_documents(documents, db_path, embedding_model):
     # Extract unique IDs from metadata to prevent duplicate document insertion
     ids = [doc.metadata["chunk_id"] for doc in documents]
     
-    print(f"Writing {len(documents)} chunk(s) to ChromaDB...")
-    vector_store.add_documents(documents, ids=ids)
+    batch_size = 32
+    print(f"Writing {len(documents)} chunk(s) to ChromaDB in batches of {batch_size}...")
+    for i in range(0, len(documents), batch_size):
+        batch_docs = documents[i : i + batch_size]
+        batch_ids = ids[i : i + batch_size]
+        vector_store.add_documents(batch_docs, ids=batch_ids)
     print("      -> Embeddings successfully saved to ChromaDB!")
     
     # Build and serialize the BM25 Index

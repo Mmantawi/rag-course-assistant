@@ -209,7 +209,6 @@ async def chat_stream(request: ChatRequest):
             # Async stream LLM tokens
             async for chunk in llm.astream(formatted_prompt):
                 yield json.dumps({"type": "token", "data": chunk.content}) + "\n"
-                await asyncio.sleep(0.001)
                 
         except ValueError as ve:
             yield json.dumps({"type": "error", "data": str(ve)}) + "\n"

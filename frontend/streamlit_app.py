@@ -15,7 +15,7 @@ st.set_page_config(
 from components import inject_theme_css, render_source_card, render_sidebar_doc
 
 # Backend API URLs
-API_BASE_URL = "http://127.0.0.1:8000"
+API_BASE_URL = os.getenv("API_BASE_URL", "http://127.0.0.1:8000").rstrip("/")
 HEALTH_URL = f"{API_BASE_URL}/health"
 UPLOAD_URL = f"{API_BASE_URL}/upload"
 CHAT_STREAM_URL = f"{API_BASE_URL}/chat/stream"
@@ -32,6 +32,8 @@ if "sources_history" not in st.session_state:
     st.session_state["sources_history"] = []
 if "active_source_index" not in st.session_state:
     st.session_state["active_source_index"] = 0
+if "uploader_version" not in st.session_state:
+    st.session_state["uploader_version"] = 0
 
 # Inject CSS based on the chosen theme
 inject_theme_css(st.session_state["theme"])
@@ -93,7 +95,7 @@ with header_right:
 import time
 
 backend_online = False
-max_retries = 10
+max_retries = 20
 retry_delay = 1.0
 
 # Show a transient status indicator while waiting for startup
@@ -110,6 +112,8 @@ with st.spinner("Connecting to Backend API Server..."):
 
 if not backend_online:
     st.error("⚠️ **Backend API Server is Offline!** Please ensure you have started the backend API server (`python main.py`).")
+    if st.button("🔄 Retry Connection"):
+        st.rerun()
     st.stop()
 
 st.markdown("---")
@@ -168,7 +172,7 @@ with doc_col:
             "Select PDF slides",
             type=["pdf"],
             accept_multiple_files=True,
-            key="pdf_uploader",
+            key=f"pdf_uploader_{st.session_state['uploader_version']}",
             label_visibility="collapsed"
         )
         
@@ -187,7 +191,7 @@ with doc_col:
                         r = requests.post(UPLOAD_URL, files=files_payload, timeout=600)
                         if r.status_code == 201:
                             st.success(f"Ingested {len(uploaded_files)} PDF(s) successfully!")
-                            st.session_state["pdf_uploader"] = None  # Clear uploader
+                            st.session_state["uploader_version"] += 1  # Clear uploader widget
                             st.rerun()
                         else:
                             st.error(f"Upload failed: {r.json().get('detail', 'Unknown error')}")
@@ -218,6 +222,7 @@ with doc_col:
                         st.session_state["last_sources"] = []
                         st.session_state["sources_history"] = []
                         st.session_state["active_source_index"] = 0
+                        st.session_state["uploader_version"] += 1  # Clear uploader widget
                         st.success("Database successfully reset!")
                         st.rerun()
                     else:

@@ -1,7 +1,17 @@
 import os
 import re
+import unicodedata
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_core.documents import Document
+
+def clean_control_chars(text: str) -> str:
+    """Removes Unicode control, format, and private-use characters except whitespace."""
+    if not text:
+        return ""
+    return "".join(
+        ch for ch in text
+        if not unicodedata.category(ch).startswith("C") or ch in ("\n", "\r", "\t")
+    )
 
 def chunk_text(file_path, chunk_size=None, chunk_overlap=None):
     """
@@ -30,11 +40,13 @@ def chunk_text(file_path, chunk_size=None, chunk_overlap=None):
         page_num = int(page_splits[i])
         page_text = page_splits[i+1].strip()
         
-        if not page_text:
+        # Clean control characters before storing
+        cleaned_text = clean_control_chars(page_text)
+        if not cleaned_text.strip():
             continue
             
         doc = Document(
-            page_content=page_text,
+            page_content=cleaned_text,
             metadata={
                 "source": source_name,
                 "page": page_num,

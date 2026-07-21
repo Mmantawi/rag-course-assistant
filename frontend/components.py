@@ -60,7 +60,8 @@ def render_source_card(source_name, page_num, snippet, score, chunk_id="Unknown"
     match_percentage = max(0, min(100, int((1.0 - score) * 100)))
     
     # URL to backend file response server with PDF page hash fragment
-    pdf_url = f"http://127.0.0.1:8000/pdf/{source_name}#page={page_num}"
+    api_base_url = os.getenv("API_BASE_URL", "http://127.0.0.1:8000").rstrip("/")
+    pdf_url = f"{api_base_url}/pdf/{source_name}#page={page_num}"
     
     card_html = f"""
     <div class="source-card">

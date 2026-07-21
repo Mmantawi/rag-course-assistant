@@ -32,3 +32,5 @@ vector_db/*
 # Other temporary or compiled files
 *.sqlite3
 *.pkl
+*.log
+data/pdfs_backup/

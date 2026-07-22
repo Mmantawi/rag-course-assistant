@@ -94,15 +94,28 @@ def render_source_card(source_name, page_num, snippet, score, chunk_id="Unknown"
     """
     st.markdown(card_html, unsafe_allow_html=True)
 
-def render_sidebar_doc(filename):
-    """Renders a styled item for a document currently stored in the index."""
+def render_sidebar_doc(doc):
+    """Renders a styled item for a document currently stored in the index, supporting status details."""
+    if isinstance(doc, dict):
+        filename = doc.get("filename", "Unknown")
+        status = doc.get("status", "ready")
+    else:
+        filename = doc
+        status = "ready"
+
     # Clean filename for display in sidebar
     clean_name = os.path.splitext(filename)[0]
     
+    status_icon = "⏳" if status == "processing" else ("✅" if status == "ready" else ("❌" if status == "failed" else "📄"))
+    
     doc_html = f"""
-    <div class="sidebar-doc-item">
-        <span>📄</span>
-        <span>{clean_name}</span>
+    <div class="sidebar-doc-item" style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; padding: 6px 10px; background: var(--bg-secondary); border-radius: 6px; border: 1px solid var(--border-color);">
+        <div style="display: flex; align-items: center; gap: 8px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+            <span>📄</span>
+            <span style="font-size: 13px; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="{filename}">{clean_name}</span>
+        </div>
+        <span style="font-size: 12px; margin-left: 6px;" title="Status: {status}">{status_icon}</span>
     </div>
     """
     st.markdown(doc_html, unsafe_allow_html=True)
+

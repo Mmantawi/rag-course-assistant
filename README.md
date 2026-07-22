@@ -10,7 +10,7 @@ It is designed to support both local execution (using Ollama) and powerful comme
 
 - **Hybrid Retrieval System**: Combines dense semantic vector search (using Chroma DB) with sparse keyword search (using BM25) and fuses the results using **Reciprocal Rank Fusion (RRF)** for optimal document matching.
 - **Dynamic Query Analysis**: Automatically analyzes user questions to determine if they need a database query (e.g. retrieval of slide content) or a direct conversational response, speeding up interactions.
-- **Multi-Model Orchestration**: Supports local models running via **Ollama** (e.g. `llama3.2` and `nomic-embed-text`) or external APIs such as **Google Gemini** (`gemini-1.5-flash`) and **Groq** (`llama-3.3-70b-versatile`).
+- **Multi-Model Orchestration**: Supports local models running via **Ollama** (e.g. `llama3.2` and `mxbai-embed-large`) or external APIs such as **Google Gemini** (`gemini-1.5-flash`) and **Groq** (`llama-3.3-70b-versatile`).
 - **Real-Time Streaming**: Implements Server-Sent Events (SSE) on the backend to stream responses token-by-token directly to the frontend for a fast, responsive user experience.
 - **Polished Streamlit Interface**:
   - Interactive Dark/Light mode theme switches.
@@ -106,7 +106,7 @@ Ensure Ollama is running in the background, and download the models:
 ollama pull llama3.2
 
 # Pull Embedding model
-ollama pull nomic-embed-text
+ollama pull mxbai-embed-large
 ```
 
 ---

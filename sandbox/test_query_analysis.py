@@ -70,7 +70,7 @@ def test_merger_and_reranker():
         (doc1_dup, 0.6)   # Should be deduplicated, keeping doc1's score (0.4)
     ]
     
-    embed_model = os.getenv("EMBEDDING_MODEL", "nomic-embed-text")
+    embed_model = os.getenv("EMBEDDING_MODEL", "mxbai-embed-large")
     embeddings = OllamaEmbeddings(model=embed_model)
     
     merger = ResultMerger(embeddings, threshold=0.75)

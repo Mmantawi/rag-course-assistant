@@ -92,6 +92,6 @@ if __name__ == "__main__":
     pdf_folder = "data/pdfs"
     processed_folder = "data/processed"
     vector_db_path = os.getenv("VECTOR_DB_PATH", "vector_db/")
-    embed_model = os.getenv("EMBEDDING_MODEL", "nomic-embed-text")
+    embed_model = os.getenv("EMBEDDING_MODEL", "mxbai-embed-large")
     
     run_ingestion_pipeline(pdf_folder, processed_folder, vector_db_path, embed_model)

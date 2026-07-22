@@ -83,7 +83,7 @@ if __name__ == "__main__":
     sys.stdout.reconfigure(encoding='utf-8')
     
     vector_db_path = os.getenv("VECTOR_DB_PATH", "vector_db/")
-    embed_model = os.getenv("EMBEDDING_MODEL", "nomic-embed-text")
+    embed_model = os.getenv("EMBEDDING_MODEL", "mxbai-embed-large")
     llm_model = os.getenv("LLM_MODEL", "llama3.2")
     top_k = int(os.getenv("TOP_K", 5))
     

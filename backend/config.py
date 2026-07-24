@@ -22,3 +22,10 @@ GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
 
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 GROQ_MODEL = os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile")
+
+# Vision Configurations
+VISION_PROVIDER = os.getenv("VISION_PROVIDER", "ollama")
+VISION_MODEL = os.getenv("VISION_MODEL", "qwen2.5-vl")
+IMAGE_OUTPUT_FOLDER = os.getenv("IMAGE_OUTPUT_FOLDER", "uploads/images/")
+ENABLE_MULTIMODAL = os.getenv("ENABLE_MULTIMODAL", "True").lower() == "true"
+MAX_IMAGES_PER_PAGE = int(os.getenv("MAX_IMAGES_PER_PAGE", "5"))

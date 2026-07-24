@@ -2,6 +2,11 @@ import os
 import json
 import requests
 import streamlit as st
+from dotenv import load_dotenv
+
+# Load local environment variables from .env
+load_dotenv()
+
 
 # Set page configurations
 st.set_page_config(

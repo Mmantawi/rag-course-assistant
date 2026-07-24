@@ -13,7 +13,7 @@ except ModuleNotFoundError:
     from retriever import retrieve_relevant_chunks
     from generator import generate_answer
 
-def run_rag_pipeline(question, db_path, embedding_model, llm_model, top_k=5):
+def run_rag_pipeline(question, db_path, embedding_model, llm_model, top_k=5, chat_history="", chat_id=None):
     """
     Orchestrates the complete RAG pipeline:
     1. Similarity search to retrieve top_k chunks.
@@ -31,7 +31,8 @@ def run_rag_pipeline(question, db_path, embedding_model, llm_model, top_k=5):
         question=question,
         db_path=db_path,
         embedding_model=embedding_model,
-        top_k=top_k
+        top_k=top_k,
+        chat_id=chat_id
     )
     
     if not retrieved_results:
@@ -70,7 +71,8 @@ def run_rag_pipeline(question, db_path, embedding_model, llm_model, top_k=5):
     answer = generate_answer(
         question=question,
         context=combined_context,
-        llm_model=llm_model
+        llm_model=llm_model,
+        chat_history=chat_history
     )
     
     return {
@@ -83,7 +85,7 @@ if __name__ == "__main__":
     sys.stdout.reconfigure(encoding='utf-8')
     
     vector_db_path = os.getenv("VECTOR_DB_PATH", "vector_db/")
-    embed_model = os.getenv("EMBEDDING_MODEL", "mxbai-embed-large")
+    embed_model = os.getenv("EMBEDDING_MODEL", "nomic-embed-text")
     llm_model = os.getenv("LLM_MODEL", "llama3.2")
     top_k = int(os.getenv("TOP_K", 5))
     

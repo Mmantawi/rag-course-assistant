@@ -1,0 +1,1261 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RAG Course Assistant</title>
+    
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Fira+Code:wght@400;500&display=swap" rel="stylesheet">
+    
+    <!-- Stylesheet -->
+    <link rel="stylesheet" href="/frontend/styles.css">
+    
+    <!-- React & Babel CDN -->
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useRef } = React;
+
+        // ==========================================================================
+        // ICONS (Inline SVGs for reliable, fast rendering without heavy dependencies)
+        // ==========================================================================
+        const Icons = {
+            Chat: () => (
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
+            ),
+            Dashboard: () => (
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="7" height="9"></rect><rect x="14" y="3" width="7" height="5"></rect><rect x="14" y="12" width="7" height="9"></rect><rect x="3" y="16" width="7" height="5"></rect></svg>
+            ),
+            Document: () => (
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+            ),
+            User: () => (
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+            ),
+            Key: () => (
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"></path></svg>
+            ),
+            Email: () => (
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path><polyline points="22,6 12,13 2,6"></polyline></svg>
+            ),
+            SignOut: () => (
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>
+            ),
+            Sun: () => (
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="7" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg>
+            ),
+            Moon: () => (
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
+            ),
+            Send: () => (
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
+            ),
+            Trash: () => (
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>
+            ),
+            Plus: () => (
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+            ),
+            ArrowLeft: () => (
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>
+            ),
+            ArrowRight: () => (
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg>
+            ),
+            Spinner: () => (
+                <svg className="animate-spin" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" style={{animation: 'spin 1s linear infinite'}}><circle cx="12" cy="12" r="10" stroke="rgba(255,255,255,0.2)" strokeWidth="3"></circle><path d="M4 12a8 8 0 0 1 8-8V0C5.373 0 0 5.373 0 12h4z" fill="currentColor"></path></svg>
+            ),
+            Folder: () => (
+                <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>
+            ),
+            FileCheck: () => (
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><polyline points="9 15 11 17 15 13"></polyline></svg>
+            ),
+            Db: () => (
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3"></ellipse><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"></path><path d="M3 12c0 1.66 4 3 9 3s9-1.34 9-3"></path></svg>
+            ),
+            Cpu: () => (
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="4" y="4" width="16" height="16" rx="2" ry="2"></rect><rect x="9" y="9" width="6" height="6"></rect><line x1="9" y1="1" x2="9" y2="4"></line><line x1="15" y1="1" x2="15" y2="4"></line><line x1="9" y1="20" x2="9" y2="23"></line><line x1="15" y1="20" x2="15" y2="23"></line><line x1="20" y1="9" x2="23" y2="9"></line><line x1="20" y1="15" x2="23" y2="15"></line><line x1="1" y1="9" x2="4" y2="9"></line><line x1="1" y1="15" x2="4" y2="15"></line></svg>
+            )
+        };
+
+        // Inject spin keyframes inside style block dynamically
+        const spinStyle = document.createElement('style');
+        spinStyle.innerHTML = `
+            @keyframes spin {
+                0% { transform: rotate(0deg); }
+                100% { transform: rotate(360deg); }
+            }
+        `;
+        document.head.appendChild(spinStyle);
+
+        // ==========================================================================
+        // MAIN APP COMPONENTS
+        // ==========================================================================
+        function App() {
+            // Authentication States
+            const [token, setToken] = useState(localStorage.getItem('token') || '');
+            const [username, setUsername] = useState(localStorage.getItem('username') || '');
+            const [email, setEmail] = useState(localStorage.getItem('email') || '');
+            const [authMode, setAuthMode] = useState('login'); // 'login' or 'register'
+            const [authError, setAuthError] = useState('');
+            const [authSuccess, setAuthSuccess] = useState('');
+            const [usernameInput, setUsernameInput] = useState('');
+            const [emailInput, setEmailInput] = useState('');
+            const [passwordInput, setPasswordInput] = useState('');
+            const [authLoading, setAuthLoading] = useState(false);
+
+            // Interface & Theme
+            const [theme, setTheme] = useState(localStorage.getItem('theme') || 'dark');
+            const [activeTab, setActiveTab] = useState('chat'); // 'chat', 'dashboard', 'documents'
+
+            // Data States
+            const [chats, setChats] = useState([]);
+            const [activeChatId, setActiveChatId] = useState(null);
+            const [messages, setMessages] = useState([]);
+            const [documents, setDocuments] = useState([]);
+            const [systemHealth, setSystemHealth] = useState(null);
+            const [isConnected, setIsConnected] = useState(false);
+            
+            // RAG States
+            const [modelChoice, setModelChoice] = useState('local');
+            const [chatInput, setChatInput] = useState('');
+            const [isStreaming, setIsStreaming] = useState(false);
+            
+            // Citations / Sources History
+            const [sourcesHistory, setSourcesHistory] = useState([]);
+            const [activeSourceIndex, setActiveSourceIndex] = useState(0);
+
+            // Rename States
+            const [editingChatId, setEditingChatId] = useState(null);
+            const [editingTitle, setEditingTitle] = useState("");
+
+            // Document Uploading States
+            const [uploadingFiles, setUploadingFiles] = useState([]);
+            const [uploadLoading, setUploadLoading] = useState(false);
+
+            const chatEndRef = useRef(null);
+            const fileInputRef = useRef(null);
+
+            // Sync theme to document body
+            useEffect(() => {
+                document.body.className = `theme-${theme}`;
+                localStorage.setItem('theme', theme);
+            }, [theme]);
+
+            // Fetch initial configuration on successful auth
+            useEffect(() => {
+                if (token) {
+                    fetchChats();
+                    fetchSystemHealth();
+                } else {
+                    // Reset cache
+                    setChats([]);
+                    setActiveChatId(null);
+                    setMessages([]);
+                    setDocuments([]);
+                    setSourcesHistory([]);
+                }
+            }, [token]);
+
+            // Fetch documents when active chat changes
+            useEffect(() => {
+                if (token) {
+                    fetchDocuments();
+                }
+            }, [activeChatId, token]);
+
+            // Periodic polling to check document processing status
+            useEffect(() => {
+                if (!token) return;
+                
+                const hasProcessing = documents.some(doc => doc.status === 'processing' || doc.status === 'uploaded');
+                if (hasProcessing) {
+                    const timer = setTimeout(() => {
+                        fetchDocuments();
+                    }, 4000);
+                    return () => clearTimeout(timer);
+                }
+            }, [documents, token]);
+
+            // Periodic health check
+            useEffect(() => {
+                fetchSystemHealth();
+                const interval = setInterval(fetchSystemHealth, 5000);
+                return () => clearInterval(interval);
+            }, []);
+
+            // Auto-scroll chat window
+            useEffect(() => {
+                if (chatEndRef.current) {
+                    chatEndRef.current.scrollIntoView({ behavior: 'smooth' });
+                }
+            }, [messages]);
+
+            // Handle API responses helper
+            const handleApiError = async (res) => {
+                if (res.status === 401) {
+                    // Token expired / Unauthorized
+                    handleSignOut();
+                    throw new Error("Session expired. Please log in again.");
+                }
+                const detail = await res.json().catch(() => ({}));
+                throw new Error(detail.detail || `Server error: ${res.statusText}`);
+            };
+
+            // ==========================================================================
+            // AUTHENTICATION REQUESTS
+            // ==========================================================================
+            const handleAuthSubmit = async (e) => {
+                e.preventDefault();
+                setAuthError('');
+                setAuthSuccess('');
+                setAuthLoading(true);
+
+                try {
+                    if (authMode === 'login') {
+                        if (!usernameInput || !passwordInput) {
+                            throw new Error("Please fill in all fields.");
+                        }
+
+                        const res = await fetch('/auth/login', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ username: usernameInput, password: passwordInput })
+                        });
+
+                        if (!res.ok) {
+                            const errorDetail = await res.json().catch(() => ({}));
+                            throw new Error(errorDetail.detail || "Invalid credentials.");
+                        }
+
+                        const data = await res.json();
+                        localStorage.setItem('token', data.access_token);
+                        localStorage.setItem('username', data.username);
+                        setToken(data.access_token);
+                        setUsername(data.username);
+                        
+                        // Fetch details
+                        const meRes = await fetch('/auth/me', {
+                            headers: { 'Authorization': `Bearer ${data.access_token}` }
+                        });
+                        if (meRes.ok) {
+                            const meData = await meRes.json();
+                            localStorage.setItem('email', meData.email);
+                            setEmail(meData.email);
+                        }
+                    } else {
+                        if (!usernameInput || !emailInput || !passwordInput) {
+                            throw new Error("Please fill in all fields.");
+                        }
+
+                        const res = await fetch('/auth/register', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                username: usernameInput,
+                                email: emailInput,
+                                password: passwordInput
+                            })
+                        });
+
+                        if (!res.ok) {
+                            const errorDetail = await res.json().catch(() => ({}));
+                            throw new Error(errorDetail.detail || "Failed to register account.");
+                        }
+
+                        setAuthSuccess("Account created successfully! Please sign in using the Login tab.");
+                        setAuthMode('login');
+                        setPasswordInput('');
+                    }
+                } catch (err) {
+                    setAuthError(err.message);
+                } finally {
+                    setAuthLoading(false);
+                }
+            };
+
+            const handleSignOut = () => {
+                localStorage.removeItem('token');
+                localStorage.removeItem('username');
+                localStorage.removeItem('email');
+                setToken('');
+                setUsername('');
+                setEmail('');
+                setAuthError('');
+                setAuthSuccess('');
+                setUsernameInput('');
+                setPasswordInput('');
+                setEmailInput('');
+            };
+
+            // ==========================================================================
+            // DATA FETCHING ACTIONS
+            // ==========================================================================
+            const fetchChats = async () => {
+                try {
+                    const res = await fetch('/chats', {
+                        headers: { 'Authorization': `Bearer ${token}` }
+                    });
+                    if (!res.ok) return handleApiError(res);
+                    const data = await res.json();
+                    setChats(data);
+                    
+                    if (data.length > 0) {
+                        // Set the first active chat
+                        handleChatSelect(data[0].id);
+                    } else {
+                        // Create first session automatically
+                        handleCreateChat("Chat Session 1");
+                    }
+                } catch (err) {
+                    console.error("Fetch chats failed:", err);
+                }
+            };
+
+            const fetchDocuments = async () => {
+                if (!activeChatId) {
+                    setDocuments([]);
+                    return;
+                }
+                try {
+                    const res = await fetch(`/documents?chat_id=${activeChatId}`, {
+                        headers: { 'Authorization': `Bearer ${token}` }
+                    });
+                    if (!res.ok) return handleApiError(res);
+                    const data = await res.json();
+                    setDocuments(data.documents || []);
+                } catch (err) {
+                    console.error("Fetch documents failed:", err);
+                }
+            };
+
+            const fetchSystemHealth = async () => {
+                try {
+                    const res = await fetch('/health');
+                    if (res.ok) {
+                        const data = await res.json();
+                        setSystemHealth(data);
+                        setIsConnected(true);
+                    } else {
+                        setIsConnected(false);
+                    }
+                } catch (err) {
+                    console.error("Fetch health failed:", err);
+                    setIsConnected(false);
+                }
+            };
+
+            const handleChatSelect = async (chatId) => {
+                setActiveChatId(chatId);
+                setSourcesHistory([]);
+                setActiveSourceIndex(0);
+                try {
+                    const res = await fetch(`/chats/${chatId}/messages`, {
+                        headers: { 'Authorization': `Bearer ${token}` }
+                    });
+                    if (!res.ok) return handleApiError(res);
+                    const data = await res.json();
+                    
+                    // Reconstruct sources history from database messages
+                    const loadedSources = [];
+                    data.forEach((msg, idx) => {
+                        if (msg.role === 'assistant' && msg.content.includes("<!-- CITATIONS:")) {
+                            try {
+                                const parts = msg.content.split("<!-- CITATIONS:");
+                                if (parts.length > 1) {
+                                    const jsonStr = parts[1].split("-->")[0].trim();
+                                    const parsedSources = JSON.parse(jsonStr);
+                                    
+                                    // Preceding user message index
+                                    const userMsgIdx = idx - 1 >= 0 ? idx - 1 : 0;
+                                    loadedSources.push({
+                                        question: data[userMsgIdx] ? data[userMsgIdx].content : "Question",
+                                        sources: parsedSources,
+                                        msgIndex: userMsgIdx
+                                    });
+                                }
+                            } catch (e) {
+                                console.warn("Failed to parse citations from message:", e);
+                            }
+                        }
+                    });
+                    
+                    setMessages(data);
+                    setSourcesHistory(loadedSources);
+                    setActiveSourceIndex(loadedSources.length - 1 >= 0 ? loadedSources.length - 1 : 0);
+                } catch (err) {
+                    console.error("Fetch messages failed:", err);
+                }
+            };
+
+            const handleCreateChat = async (titleText) => {
+                try {
+                    const title = titleText || `Chat ${chats.length + 1}`;
+                    const res = await fetch('/chats', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': `Bearer ${token}`
+                        },
+                        body: JSON.stringify({ title })
+                    });
+                    if (!res.ok) return handleApiError(res);
+                    const newChat = await res.json();
+                    setChats(prev => [newChat, ...prev]);
+                    setActiveChatId(newChat.id);
+                    setMessages([]);
+                    setSourcesHistory([]);
+                    setActiveSourceIndex(0);
+                } catch (err) {
+                    console.error("Create chat failed:", err);
+                }
+            };
+
+            const handleSaveTitle = async (chatId) => {
+                if (!editingTitle.trim()) {
+                    setEditingChatId(null);
+                    return;
+                }
+                try {
+                    const res = await fetch(`/chats/${chatId}`, {
+                        method: 'PUT',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': `Bearer ${token}`
+                        },
+                        body: JSON.stringify({ title: editingTitle.trim() })
+                    });
+                    if (res.ok) {
+                        const updated = await res.json();
+                        setChats(prev => prev.map(c => c.id === chatId ? { ...c, title: updated.title } : c));
+                    } else {
+                        handleApiError(res);
+                    }
+                } catch (err) {
+                    console.error("Rename chat failed:", err);
+                } finally {
+                    setEditingChatId(null);
+                }
+            };
+
+            const handleDeleteChat = async (e, chatId) => {
+                e.stopPropagation(); // Avoid selecting chat row
+                if (!confirm("Are you sure you want to delete this chat session?")) return;
+                
+                try {
+                    const res = await fetch(`/chats/${chatId}`, {
+                        method: 'DELETE',
+                        headers: { 'Authorization': `Bearer ${token}` }
+                    });
+                    if (!res.ok) return handleApiError(res);
+                    
+                    setChats(prev => prev.filter(c => c.id !== chatId));
+                    if (activeChatId === chatId) {
+                        const remaining = chats.filter(c => c.id !== chatId);
+                        if (remaining.length > 0) {
+                            handleChatSelect(remaining[0].id);
+                        } else {
+                            // Automatically recreate a fresh chat session
+                            handleCreateChat("Chat Session 1");
+                        }
+                    }
+                } catch (err) {
+                    console.error("Delete chat failed:", err);
+                }
+            };
+
+            // ==========================================================================
+            // DOCUMENT OPERATIONS (Ingestion and Deletion)
+            // ==========================================================================
+            const handleFileChange = (e) => {
+                if (e.target.files) {
+                    setUploadingFiles(Array.from(e.target.files));
+                }
+            };
+
+            const handleIngestDocuments = async () => {
+                if (uploadingFiles.length === 0) return;
+                setUploadLoading(true);
+                
+                const formData = new FormData();
+                uploadingFiles.forEach(file => {
+                    formData.append('files', file);
+                });
+                if (activeChatId) {
+                    formData.append('chat_id', activeChatId);
+                }
+
+                try {
+                    const res = await fetch('/upload', {
+                        method: 'POST',
+                        headers: { 'Authorization': `Bearer ${token}` },
+                        body: formData
+                    });
+
+                    if (!res.ok) return handleApiError(res);
+                    
+                    alert("Documents uploaded! Ingestion processing in background.");
+                    setUploadingFiles([]);
+                    if (fileInputRef.current) fileInputRef.current.value = '';
+                    fetchDocuments(); // Refresh documents state
+                } catch (err) {
+                    alert(`Upload failed: ${err.message}`);
+                } finally {
+                    setUploadLoading(false);
+                }
+            };
+
+            const handleDeleteSingleDocument = async (docId, filename) => {
+                if (!confirm(`Are you sure you want to delete "${filename}"? This will remove all its chunks and index references.`)) return;
+
+                try {
+                    const res = await fetch(`/documents/${docId}`, {
+                        method: 'DELETE',
+                        headers: { 'Authorization': `Bearer ${token}` }
+                    });
+
+                    if (!res.ok) return handleApiError(res);
+                    
+                    alert(`Successfully deleted "${filename}"`);
+                    fetchDocuments();
+                    fetchChats(); // Refresh messages/chats in case details changed
+                } catch (err) {
+                    alert(`Failed to delete document: ${err.message}`);
+                }
+            };
+
+            const handleResetVectorStore = async () => {
+                if (!confirm("CRITICAL WARNING: This will delete ALL documents, reset the entire vector collection, and purge the BM25 index. Continue?")) return;
+
+                try {
+                    const res = await fetch('/documents', {
+                        method: 'DELETE',
+                        headers: { 'Authorization': `Bearer ${token}` }
+                    });
+
+                    if (!res.ok) return handleApiError(res);
+
+                    alert("Database successfully reset!");
+                    setMessages([]);
+                    setSourcesHistory([]);
+                    setActiveSourceIndex(0);
+                    fetchDocuments();
+                } catch (err) {
+                    alert(`Failed to clear database: ${err.message}`);
+                }
+            };
+
+            // ==========================================================================
+            // STREAMING RAG QUERY ACTION
+            // ==========================================================================
+            const handleSendQuery = async (e) => {
+                e.preventDefault();
+                if (!chatInput.trim() || isStreaming) return;
+                if (!activeChatId) {
+                    alert("Please select or create a chat session first.");
+                    return;
+                }
+
+                const question = chatInput;
+                setChatInput('');
+                setIsStreaming(true);
+
+                // Add user message locally
+                const userMsg = { role: 'user', content: question, id: 'temp-user-id' };
+                setMessages(prev => [...prev, userMsg]);
+
+                // Create placeholder assistant message
+                const assistantMsgPlaceholder = { role: 'assistant', content: '', id: 'temp-bot-id' };
+                setMessages(prev => [...prev, assistantMsgPlaceholder]);
+
+                try {
+                    const res = await fetch('/chat/stream', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': `Bearer ${token}`
+                        },
+                        body: JSON.stringify({
+                            chat_id: activeChatId,
+                            question: question,
+                            model_choice: modelChoice
+                        })
+                    });
+
+                    if (!res.ok) {
+                        setIsStreaming(false);
+                        return handleApiError(res);
+                    }
+
+                    const reader = res.body.getReader();
+                    const decoder = new TextDecoder('utf-8');
+                    let buffer = '';
+                    let fullBotAnswer = '';
+
+                    while (true) {
+                        const { value, done } = await reader.read();
+                        if (done) break;
+
+                        buffer += decoder.decode(value, { stream: true });
+                        const lines = buffer.split('\n');
+                        buffer = lines.pop(); // Hold partial line in buffer
+
+                        for (const line of lines) {
+                            if (!line.trim()) continue;
+                            try {
+                                const parsed = JSON.parse(line);
+                                if (parsed.type === 'sources') {
+                                    const sources = parsed.data;
+                                    setSourcesHistory(prev => {
+                                        const newHist = [...prev, {
+                                            question: question,
+                                            sources: sources,
+                                            msgIndex: messages.length // Point to index of user message
+                                        }];
+                                        setActiveSourceIndex(newHist.length - 1);
+                                        return newHist;
+                                    });
+                                } else if (parsed.type === 'token') {
+                                    fullBotAnswer += parsed.data;
+                                    setMessages(prev => {
+                                        const next = [...prev];
+                                        if (next.length > 0) {
+                                            next[next.length - 1] = {
+                                                role: 'assistant',
+                                                content: fullBotAnswer
+                                            };
+                                        }
+                                        return next;
+                                    });
+                                } else if (parsed.type === 'error') {
+                                    alert(`RAG Pipeline error: ${parsed.data}`);
+                                }
+                            } catch (err) {
+                                console.warn("Failed to parse SSE line:", err, line);
+                            }
+                        }
+                    }
+                } catch (err) {
+                    alert(`Streaming error: ${err.message}`);
+                } finally {
+                    setIsStreaming(false);
+                    // Refresh message details properly from DB
+                    handleChatSelect(activeChatId);
+                }
+            };
+
+            // Calculate overall document size stats
+            const totalDocsSizeMB = (documents.reduce((acc, doc) => acc + doc.file_size, 0) / (1024 * 1024)).toFixed(2);
+            
+            // ==========================================================================
+            // RENDER AUTHENTICATION CONTAINER
+            // ==========================================================================
+            if (!token) {
+                return (
+                    <div className="auth-page">
+                        <div className="auth-card">
+                            <div className="auth-header">
+                                <h1>🤖 RAG Course Assistant</h1>
+                                <p>Sign in to build your slide knowledge indexes and save chat logs</p>
+                            </div>
+                            
+                            <div className="auth-tabs">
+                                <div 
+                                    className={`auth-tab ${authMode === 'login' ? 'active' : ''}`}
+                                    onClick={() => { setAuthMode('login'); setAuthError(''); setAuthSuccess(''); }}
+                                >
+                                    🔑 Sign In
+                                </div>
+                                <div 
+                                    className={`auth-tab ${authMode === 'register' ? 'active' : ''}`}
+                                    onClick={() => { setAuthMode('register'); setAuthError(''); setAuthSuccess(''); }}
+                                >
+                                    📝 Create Account
+                                </div>
+                            </div>
+
+                            {authError && <div className="auth-error">{authError}</div>}
+                            {authSuccess && <div className="auth-success">{authSuccess}</div>}
+
+                            <form onSubmit={handleAuthSubmit}>
+                                <div className="form-group">
+                                    <label>Username</label>
+                                    <div className="input-icon-wrapper">
+                                        <span className="input-icon"><Icons.User /></span>
+                                        <input 
+                                            type="text" 
+                                            className="form-input" 
+                                            placeholder="Enter your username"
+                                            value={usernameInput}
+                                            onChange={(e) => setUsernameInput(e.target.value)}
+                                        />
+                                    </div>
+                                </div>
+
+                                {authMode === 'register' && (
+                                    <div className="form-group">
+                                        <label>Email Address</label>
+                                        <div className="input-icon-wrapper">
+                                            <span className="input-icon"><Icons.Email /></span>
+                                            <input 
+                                                type="email" 
+                                                className="form-input" 
+                                                placeholder="Enter your email"
+                                                value={emailInput}
+                                                onChange={(e) => setEmailInput(e.target.value)}
+                                            />
+                                        </div>
+                                    </div>
+                                )}
+
+                                <div className="form-group">
+                                    <label>Password</label>
+                                    <div className="input-icon-wrapper">
+                                        <span className="input-icon"><Icons.Key /></span>
+                                        <input 
+                                            type="password" 
+                                            className="form-input" 
+                                            placeholder="Enter your password"
+                                            value={passwordInput}
+                                            onChange={(e) => setPasswordInput(e.target.value)}
+                                        />
+                                    </div>
+                                </div>
+
+                                <button type="submit" className="auth-btn" disabled={authLoading}>
+                                    {authLoading ? <Icons.Spinner /> : (authMode === 'login' ? 'Sign In' : 'Register User')}
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                );
+            }
+
+            // ==========================================================================
+            // RENDER CORE APPLICATION INTERFACE
+            // ==========================================================================
+            return (
+                <div className="app-container">
+                    
+                    {/* Sidebar Nav */}
+                    <div className="app-sidebar">
+                        <div className="sidebar-brand">
+                            <h2>🤖 RAG Assistant</h2>
+                        </div>
+                        
+                        <div className="sidebar-menu">
+                            <div 
+                                className={`sidebar-item ${activeTab === 'chat' ? 'active' : ''}`}
+                                onClick={() => setActiveTab('chat')}
+                            >
+                                <Icons.Chat />
+                                <span>Assistant Chat</span>
+                            </div>
+                            <div 
+                                className={`sidebar-item ${activeTab === 'dashboard' ? 'active' : ''}`}
+                                onClick={() => setActiveTab('dashboard')}
+                            >
+                                <Icons.Dashboard />
+                                <span>Analytics Dashboard</span>
+                            </div>
+                            <div 
+                                className={`sidebar-item ${activeTab === 'documents' ? 'active' : ''}`}
+                                onClick={() => setActiveTab('documents')}
+                            >
+                                <Icons.Document />
+                                <span>Document Manager</span>
+                            </div>
+
+                            {(activeTab === 'chat' || activeTab === 'documents') && (
+                                <div style={{marginTop: '20px'}}>
+                                    <div style={{fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted)', padding: '0 12px 8px 12px'}}>
+                                        Chat Sessions
+                                    </div>
+                                    <button className="signout-btn" style={{width: '100%', marginBottom: '10px'}} onClick={() => handleCreateChat(`Chat ${chats.length + 1}`)}>
+                                        <Icons.Plus /> New Session
+                                    </button>
+                                    <div style={{display: 'flex', flexDirection: 'column', gap: '4px', maxHeight: '200px', overflowY: 'auto'}}>
+                                        {chats.map(c => {
+                                            const isActive = c.id === activeChatId;
+                                            const isEditing = c.id === editingChatId;
+                                            return (
+                                                <div 
+                                                    key={c.id} 
+                                                    className={`sidebar-item`} 
+                                                    style={{
+                                                        padding: '8px 12px', 
+                                                        background: isActive ? 'var(--bg-tertiary)' : 'transparent',
+                                                        color: isActive ? 'var(--text-primary)' : 'var(--text-secondary)',
+                                                        fontSize: '0.85rem',
+                                                        justifyContent: 'space-between'
+                                                    }}
+                                                    onClick={() => {
+                                                        if (!isEditing) handleChatSelect(c.id);
+                                                    }}
+                                                >
+                                                    {isEditing ? (
+                                                        <input
+                                                            type="text"
+                                                            value={editingTitle}
+                                                            onChange={(e) => setEditingTitle(e.target.value)}
+                                                            onBlur={() => handleSaveTitle(c.id)}
+                                                            onKeyDown={(e) => {
+                                                                if (e.key === 'Enter') handleSaveTitle(c.id);
+                                                                if (e.key === 'Escape') setEditingChatId(null);
+                                                            }}
+                                                            autoFocus
+                                                            onClick={(e) => e.stopPropagation()}
+                                                            style={{
+                                                                background: 'rgba(255, 255, 255, 0.1)',
+                                                                border: '1px solid rgba(255, 255, 255, 0.2)',
+                                                                borderRadius: '4px',
+                                                                color: 'var(--text-primary)',
+                                                                padding: '2px 4px',
+                                                                fontSize: '0.85rem',
+                                                                width: '80%',
+                                                                outline: 'none'
+                                                            }}
+                                                        />
+                                                    ) : (
+                                                        <span 
+                                                            onClick={(e) => {
+                                                                if (isActive) {
+                                                                    e.stopPropagation();
+                                                                    setEditingChatId(c.id);
+                                                                    setEditingTitle(c.title);
+                                                                }
+                                                            }}
+                                                            onDoubleClick={(e) => {
+                                                                e.stopPropagation();
+                                                                setEditingChatId(c.id);
+                                                                setEditingTitle(c.title);
+                                                            }}
+                                                            style={{overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '80%', cursor: 'pointer'}}
+                                                            title="Click active title or double-click to rename"
+                                                        >
+                                                            💬 {c.title}
+                                                        </span>
+                                                    )}
+                                                    <button 
+                                                        style={{background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer'}}
+                                                        onClick={(e) => handleDeleteChat(e, c.id)}
+                                                    >
+                                                        <Icons.Trash />
+                                                    </button>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+
+                        <div className="sidebar-user">
+                            <div className="user-info">
+                                <div className="user-avatar">
+                                    {username ? username.charAt(0).toUpperCase() : 'U'}
+                                </div>
+                                <div className="user-details">
+                                    <div className="user-name">{username}</div>
+                                    <div className="user-email">{email || 'RAG User'}</div>
+                                </div>
+                            </div>
+                            <button className="signout-btn" onClick={handleSignOut}>
+                                <Icons.SignOut />
+                                <span>Sign Out</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    {/* Main Container */}
+                    <div className="app-main">
+                        <div className="main-header">
+                            <h1>
+                                {activeTab === 'chat' && "💬 Assistant Chat console"}
+                                {activeTab === 'dashboard' && "📊 Analytics & System Dashboard"}
+                                {activeTab === 'documents' && "📁 Document Indexing Manager"}
+                            </h1>
+                            
+                            <div className="header-actions">
+                                <div className="connection-status" title={isConnected ? "Backend Connection: Online" : "Backend Connection: Offline"}>
+                                    <span className={`status-bulb ${isConnected ? 'connected' : 'disconnected'}`}></span>
+                                    <span className="status-text">{isConnected ? 'Online' : 'Offline'}</span>
+                                </div>
+                                <button className="theme-toggle-btn" onClick={() => setTheme(theme === 'light' ? 'dark' : 'light')}>
+                                    {theme === 'light' ? <Icons.Moon /> : <Icons.Sun />}
+                                </button>
+                            </div>
+                        </div>
+
+                        <div className="main-body" style={{padding: activeTab === 'chat' ? '0' : '32px'}}>
+                            
+                            {/* ==========================================================
+                                TAB: ASSISTANT CHAT
+                                ========================================================== */}
+                            {activeTab === 'chat' && (
+                                <div className="chat-workspace">
+                                    <div className="chat-panel">
+                                        <div className="chat-history-container">
+                                            {messages.length === 0 ? (
+                                                <div style={{margin: 'auto', textAlign: 'center', maxWidth: '400px', color: 'var(--text-secondary)'}}>
+                                                    <h3 style={{marginBottom: '10px'}}>Welcome to RAG Assistant!</h3>
+                                                    <p style={{fontSize: '0.9rem'}}>Upload some PDF documents in the Document Manager, choose your model, and ask questions about your slides.</p>
+                                                </div>
+                                            ) : (
+                                                messages.map((msg, i) => {
+                                                    const isUser = msg.role === 'user';
+                                                    let isHighlighted = false;
+                                                    
+                                                    // Highlight active citation matching message
+                                                    if (isUser && sourcesHistory.length > 0 && activeSourceIndex < sourcesHistory.length) {
+                                                        isHighlighted = (i === sourcesHistory[activeSourceIndex].msgIndex);
+                                                    }
+                                                    
+                                                    let displayText = msg.content;
+                                                    if (msg.role === 'assistant' && msg.content.includes("<!-- CITATIONS:")) {
+                                                        displayText = msg.content.split("<!-- CITATIONS:")[0].trim();
+                                                    }
+                                                    
+                                                    return (
+                                                        <div key={msg.id || i} className={`message-wrapper ${msg.role}`}>
+                                                            <div className={`message-bubble ${isHighlighted ? 'highlighted' : ''}`}>
+                                                                <p style={{whiteSpace: 'pre-wrap'}}>{displayText}</p>
+                                                            </div>
+                                                        </div>
+                                                    );
+                                                })
+                                            )}
+                                            <div ref={chatEndRef} />
+                                        </div>
+
+                                        <form className="chat-input-bar" onSubmit={handleSendQuery}>
+                                            <div className="chat-input-row">
+                                                <input 
+                                                    className="chat-textarea"
+                                                    placeholder="Ask a question about the slides..."
+                                                    value={chatInput}
+                                                    onChange={(e) => setChatInput(e.target.value)}
+                                                    disabled={isStreaming}
+                                                />
+                                                <button type="submit" className="send-btn" disabled={isStreaming || !chatInput.trim()}>
+                                                    {isStreaming ? <Icons.Spinner /> : <Icons.Send />}
+                                                </button>
+                                            </div>
+
+                                            <div className="chat-config-row">
+                                                <div className="config-selector">
+                                                    <span>🤖 Active LLM Model:</span>
+                                                    <select 
+                                                        className="config-select"
+                                                        value={modelChoice}
+                                                        onChange={(e) => setModelChoice(e.target.value)}
+                                                    >
+                                                        <option value="local">Local (Ollama)</option>
+                                                        <option value="gemini">Gemini API</option>
+                                                        <option value="groq">Groq API</option>
+                                                    </select>
+                                                </div>
+                                            </div>
+                                        </form>
+                                    </div>
+
+                                    {/* Sources Panel */}
+                                    <div className="citations-panel">
+                                        <div className="citations-header">
+                                            <h3>Slide Reference Citations</h3>
+                                            {sourcesHistory.length > 0 && (
+                                                <div className="citations-nav">
+                                                    <button 
+                                                        className="citations-nav-btn"
+                                                        disabled={activeSourceIndex === 0}
+                                                        onClick={() => setActiveSourceIndex(prev => Math.max(0, prev - 1))}
+                                                    >
+                                                        <Icons.ArrowLeft />
+                                                    </button>
+                                                    <span style={{fontSize: '0.85rem', fontWeight: 600}}>
+                                                        {activeSourceIndex + 1} / {sourcesHistory.length}
+                                                    </span>
+                                                    <button 
+                                                        className="citations-nav-btn"
+                                                        disabled={activeSourceIndex === sourcesHistory.length - 1}
+                                                        onClick={() => setActiveSourceIndex(prev => Math.min(sourcesHistory.length - 1, prev + 1))}
+                                                    >
+                                                        <Icons.ArrowRight />
+                                                    </button>
+                                                </div>
+                                            )}
+                                        </div>
+
+                                        <div className="citations-body">
+                                            {sourcesHistory.length === 0 ? (
+                                                <div style={{textAlign: 'center', color: 'var(--text-muted)', marginTop: '40px', fontSize: '0.9rem'}}>
+                                                    No references retrieved yet. Ask a question to see matching slide content.
+                                                </div>
+                                            ) : (
+                                                (() => {
+                                                    const activeItem = sourcesHistory[activeSourceIndex];
+                                                    if (!activeItem || !activeItem.sources) return null;
+                                                    
+                                                    const filtered = activeItem.sources.filter(s => {
+                                                        const matchPct = Math.max(0, Math.min(100, Math.round((1.0 - s.score) * 100)));
+                                                        return matchPct >= 10;
+                                                    });
+
+                                                    if (filtered.length === 0) {
+                                                        return <div style={{textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.85rem'}}>No high-confidence sources matching the threshold.</div>;
+                                                    }
+
+                                                    return filtered.map((src, idx) => {
+                                                        const matchPercentage = Math.max(0, Math.min(100, Math.round((1 - src.score) * 100)));
+                                                        const cleanName = src.source.replace(/\.[^/.]+$/, ""); // Strip extension
+                                                        const pdfUrl = `/pdf/${src.source}?token=${encodeURIComponent(token)}#page=${src.page}`;
+
+                                                        return (
+                                                            <div key={idx} className="source-card">
+                                                                <div className="source-header">
+                                                                    <span className="source-title" title={src.source}>{cleanName}</span>
+                                                                    <span className="source-score">{matchPercentage}% Match</span>
+                                                                </div>
+                                                                <div className="source-meta">
+                                                                    <span>Page {src.page}</span>
+                                                                </div>
+                                                                <div className="source-snippet">
+                                                                    {src.content}
+                                                                </div>
+                                                                
+                                                                <div className="source-debug-info">
+                                                                    <span className="debug-tag">Vector Dist: {src.vector_score.toFixed(4)}</span>
+                                                                    <span className="debug-tag">BM25: {src.bm25_score.toFixed(2)}</span>
+                                                                    <span className="debug-tag">RRF Score: {src.rrf_score.toFixed(4)}</span>
+                                                                    <div className="debug-id">ID: {src.chunk_id}</div>
+                                                                </div>
+
+                                                                <a href={pdfUrl} target="_blank" className="open-slide-btn">
+                                                                    Open Slide Page ↗
+                                                                </a>
+                                                            </div>
+                                                        );
+                                                    });
+                                                })()
+                                            )}
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* ==========================================================
+                                TAB: ANALYTICS DASHBOARD
+                                ========================================================== */}
+                            {activeTab === 'dashboard' && (
+                                <div>
+                                    {/* KPI Stats cards */}
+                                    <div className="dashboard-grid">
+                                        <div className="kpi-card">
+                                            <div className="kpi-icon-wrapper">
+                                                <Icons.Document />
+                                            </div>
+                                            <div className="kpi-content">
+                                                <span className="kpi-label">Indexed Documents</span>
+                                                <span className="kpi-value">{documents.length}</span>
+                                            </div>
+                                        </div>
+
+                                        <div className="kpi-card">
+                                            <div className="kpi-icon-wrapper">
+                                                <Icons.Folder />
+                                            </div>
+                                            <div className="kpi-content">
+                                                <span className="kpi-label">Disk Storage</span>
+                                                <span className="kpi-value">{totalDocsSizeMB} MB</span>
+                                            </div>
+                                        </div>
+
+                                        <div className="kpi-card">
+                                            <div className="kpi-icon-wrapper">
+                                                <Icons.Chat />
+                                            </div>
+                                            <div className="kpi-content">
+                                                <span className="kpi-label">Chat Sessions</span>
+                                                <span className="kpi-value">{chats.length}</span>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Lower details split */}
+                                    <div className="dashboard-details-row">
+                                        
+                                        {/* Storage Limit meter */}
+                                        <div className="detail-panel">
+                                            <h3 className="panel-title"><Icons.FileCheck /> Vector Space Allocations</h3>
+                                            
+                                            <div className="storage-meter-container" style={{marginBottom: '24px'}}>
+                                                <div className="storage-stats">
+                                                    <span>Storage Limit Utilization</span>
+                                                    <span>{totalDocsSizeMB} MB / 100.00 MB</span>
+                                                </div>
+                                                <div className="progress-bar-bg">
+                                                    <div 
+                                                        className="progress-bar-fill"
+                                                        style={{width: `${Math.min(100, (parseFloat(totalDocsSizeMB) / 100) * 100)}%`}}
+                                                    />
+                                                </div>
+                                            </div>
+
+                                            <div style={{background: 'var(--bg-secondary)', border: '1px solid var(--border-color)', borderRadius: '10px', padding: '16px', fontSize: '0.9rem', color: 'var(--text-secondary)'}}>
+                                                <h4 style={{color: 'var(--text-primary)', fontWeight: 700, marginBottom: '6px'}}>Index Health Summary</h4>
+                                                <p style={{marginBottom: '10px'}}>Chroma DB collection indexing status is optimized. Vector search operations are functioning with standard Euclidean distance retrieval parameters.</p>
+                                                <p>BM25 term calculations are loaded and fitted over active document chunks.</p>
+                                            </div>
+                                        </div>
+
+
+
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* ==========================================================
+                                TAB: DOCUMENT MANAGER
+                                ========================================================== */}
+                            {activeTab === 'documents' && (
+                                <div>
+                                    {!activeChatId ? (
+                                        <div style={{textAlign: 'center', padding: '40px', background: 'var(--bg-secondary)', borderRadius: '12px', border: '1px solid var(--border-color)'}}>
+                                            <div style={{fontSize: '2rem', marginBottom: '16px'}}>💬</div>
+                                            <h3 style={{marginBottom: '8px'}}>No Active Chat Session</h3>
+                                            <p style={{color: 'var(--text-secondary)', fontSize: '0.9rem', maxWidth: '400px', margin: '0 auto'}}>
+                                                Each chat session has its own separate collection of PDF slides. Please select an existing chat session or start a new one from the sidebar before uploading and indexing documents.
+                                            </p>
+                                        </div>
+                                    ) : (
+                                        <>
+                                            {/* Upload zone */}
+                                            <div className="upload-zone" onClick={() => fileInputRef.current && fileInputRef.current.click()}>
+                                                <div className="upload-icon">📤</div>
+                                                <p>Click here to select PDF slide files for indexing</p>
+                                        <span>Supports multi-file selection (.pdf)</span>
+                                        <input 
+                                            type="file" 
+                                            ref={fileInputRef} 
+                                            style={{display: 'none'}} 
+                                            accept=".pdf" 
+                                            multiple 
+                                            onChange={handleFileChange}
+                                        />
+                                    </div>
+
+                                    {/* Files pending upload list */}
+                                    {uploadingFiles.length > 0 && (
+                                        <div className="detail-panel" style={{marginBottom: '24px'}}>
+                                            <h4 style={{fontWeight: 700, marginBottom: '12px'}}>Files Selected for Ingestion ({uploadingFiles.length})</h4>
+                                            <div className="file-preview-list">
+                                                {uploadingFiles.map((file, idx) => (
+                                                    <div key={idx} className="file-preview-item">
+                                                        <span className="file-preview-name">{file.name}</span>
+                                                        <span style={{color: 'var(--text-muted)', fontSize: '0.8rem'}}>{(file.size / (1024 * 1024)).toFixed(2)} MB</span>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                            
+                                            <button 
+                                                className="auth-btn" 
+                                                style={{display: 'flex', gap: '8px', alignItems: 'center', justifyContent: 'center', width: 'auto', padding: '10px 24px'}}
+                                                onClick={handleIngestDocuments}
+                                                disabled={uploadLoading}
+                                            >
+                                                {uploadLoading ? <Icons.Spinner /> : '🚀 Start Document Ingestion'}
+                                            </button>
+                                        </div>
+                                    )}
+
+                                    {/* Documents details table */}
+                                    <div className="detail-panel">
+                                        <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px'}}>
+                                            <h3 className="panel-title" style={{border: 'none', padding: 0, margin: 0}}>Indexed Course Materials</h3>
+                                            
+                                            {documents.length > 0 && (
+                                                <button className="action-btn delete" onClick={handleResetVectorStore}>
+                                                    <Icons.Trash /> Wipe Database Index
+                                                </button>
+                                            )}
+                                        </div>
+
+                                        {documents.length === 0 ? (
+                                            <div style={{textAlign: 'center', padding: '40px', color: 'var(--text-muted)'}}>
+                                                No documents indexed yet. Use the selector above to upload slide PDFs.
+                                            </div>
+                                        ) : (
+                                            <div className="table-container">
+                                                <table className="doc-table">
+                                                    <thead>
+                                                        <tr>
+                                                            <th>Filename</th>
+                                                            <th>File Size</th>
+                                                            <th>Uploaded At</th>
+                                                            <th>Ingestion Status</th>
+                                                            <th>Actions</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody>
+                                                        {documents.map((doc) => {
+                                                            const uploadDate = new Date(doc.uploaded_at).toLocaleString();
+                                                            const cleanName = doc.filename.replace(/\.[^/.]+$/, "");
+                                                            return (
+                                                                <tr key={doc.id}>
+                                                                    <td style={{fontWeight: 600}} title={doc.filename}>{cleanName}</td>
+                                                                    <td>{(doc.file_size / (1024 * 1024)).toFixed(2)} MB</td>
+                                                                    <td style={{color: 'var(--text-secondary)'}}>{uploadDate}</td>
+                                                                    <td>
+                                                                        <span className={`doc-status ${doc.status}`}>
+                                                                            {doc.status === 'processing' && <Icons.Spinner />}
+                                                                            {doc.status}
+                                                                        </span>
+                                                                    </td>
+                                                                    <td>
+                                                                        <div className="doc-actions">
+                                                                            <a href={`/pdf/${doc.filename}?token=${encodeURIComponent(token)}`} target="_blank" className="action-btn view">
+                                                                                👁️ View Slide
+                                                                            </a>
+                                                                            <button 
+                                                                                className="action-btn delete" 
+                                                                                onClick={() => handleDeleteSingleDocument(doc.id, doc.filename)}
+                                                                            >
+                                                                                <Icons.Trash /> Delete
+                                                                            </button>
+                                                                        </div>
+                                                                    </td>
+                                                                </tr>
+                                                            );
+                                                        })}
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                        )}
+                                    </div>
+                                    </>
+                                    )}
+                                </div>
+                             )}
+
+                        </div>
+                    </div>
+
+                </div>
+            );
+        }
+
+        // Render React Application
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>

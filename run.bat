@@ -1,4 +1,5 @@
 @echo off
+echo Starting integrated RAG Course Assistant Backend & React Frontend...
 start cmd /k "python main.py"
-start cmd /k "streamlit run frontend/streamlit_app.py"
-
+timeout /t 3 >nul
+start http://127.0.0.1:8000

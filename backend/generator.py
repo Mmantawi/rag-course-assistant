@@ -59,7 +59,7 @@ def get_llm(model_choice: str):
             from langchain_community.chat_models import ChatOllama
         return ChatOllama(model=ollama_model, temperature=0)
 
-def generate_answer(question, context, llm_model):
+def generate_answer(question, context, llm_model, chat_history=""):
     """
     Formulates a prompt using the context and question, queries the selected LLM,
     and returns the generated answer.
@@ -67,7 +67,7 @@ def generate_answer(question, context, llm_model):
     llm = get_llm(llm_model)
     
     # Format the prompt with inputs
-    formatted_prompt = RAG_PROMPT.format(context=context, question=question)
+    formatted_prompt = RAG_PROMPT.format(context=context, chat_history=chat_history, question=question)
     
     # Invoke the model
     response = llm.invoke(formatted_prompt)

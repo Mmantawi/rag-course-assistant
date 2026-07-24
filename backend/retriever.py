@@ -16,7 +16,7 @@ except ImportError:
     print("[ERROR] Could not import Chroma. Make sure chromadb is installed.")
     sys.exit(1)
 
-def retrieve_relevant_chunks(question, db_path, embedding_model, top_k=5):
+def retrieve_relevant_chunks(question, db_path, embedding_model, top_k=5, chat_id=None):
     """
     Connects to ChromaDB and performs a pre-retrieval query analysis and
     post-retrieval reranking pipeline:
@@ -69,7 +69,7 @@ def retrieve_relevant_chunks(question, db_path, embedding_model, top_k=5):
     
     # 3. Multi-Concept Retrieval
     retriever = MultiRetriever(vector_store)
-    raw_candidates = retriever.retrieve(concepts, top_k=top_k)
+    raw_candidates = retriever.retrieve(concepts, top_k=top_k, chat_id=chat_id)
     
     # 4. Result Merging & Deduplication & Page Diversity Filter
     merger = ResultMerger(embeddings)
@@ -80,7 +80,52 @@ def retrieve_relevant_chunks(question, db_path, embedding_model, top_k=5):
     reranked_candidates = reranker.rerank(normalized_q, merged_candidates)
     
     # Return the top k reranked documents
-    return reranked_candidates[:top_k]
+    child_results = reranked_candidates[:top_k]
+    
+    # Perform Parent Expansion on retrieved child results
+    try:
+        from langchain_core.documents import Document
+        from backend.parent_store import ParentStore
+        parent_store = ParentStore(db_path)
+        
+        expanded_results = []
+        seen_parents = set()
+        
+        for child_doc, score in child_results:
+            parent_id = child_doc.metadata.get("parent_id")
+            if parent_id:
+                if parent_id in seen_parents:
+                    # Skip duplicate parents
+                    continue
+                seen_parents.add(parent_id)
+                
+                parent_data = parent_store.get_parent(parent_id)
+                if parent_data:
+                    # Reconstruct parent document wrapping full text
+                    parent_doc = Document(
+                        page_content=parent_data["content"],
+                        metadata={
+                            "source": parent_data["filename"],
+                            "page": parent_data["page"],
+                            "section": parent_data["title"],
+                            "chunk_id": parent_data["parent_id"],
+                            "parent_id": parent_data["parent_id"],
+                            "filename": parent_data["filename"],
+                            "vector_score": child_doc.metadata.get("vector_score", 1.0),
+                            "bm25_score": child_doc.metadata.get("bm25_score", 0.0),
+                            "rrf_score": child_doc.metadata.get("rrf_score", 0.0)
+                        }
+                    )
+                    expanded_results.append((parent_doc, score))
+                else:
+                    expanded_results.append((child_doc, score))
+            else:
+                expanded_results.append((child_doc, score))
+                
+        return expanded_results
+    except Exception as e:
+        print(f"[WARNING] Parent expansion failed: {e}. Falling back to raw child chunks.", file=sys.stderr)
+        return child_results
 
 if __name__ == "__main__":
     # Ensure UTF-8 output on Windows
@@ -88,7 +133,7 @@ if __name__ == "__main__":
     
     # Read settings from environment variables
     vector_db_path = os.getenv("VECTOR_DB_PATH", "vector_db/")
-    embed_model = os.getenv("EMBEDDING_MODEL", "mxbai-embed-large")
+    embed_model = os.getenv("EMBEDDING_MODEL", "nomic-embed-text")
     default_top_k = int(os.getenv("TOP_K", 5))
     
     # Use command-line arguments as the test question, or default to a slide topic

@@ -141,16 +141,18 @@ class MultiRetriever:
             print(f"[MultiRetriever] Warning: BM25 index file not found at '{bm25_path}'. "
                   f"Exact keyword match will be skipped until ingestion runs.")
         
-    def retrieve(self, concepts: list[str], top_k: int = 5) -> list[tuple[Document, float]]:
+    def retrieve(self, concepts: list[str], top_k: int = 5, chat_id: str = None) -> list[tuple[Document, float]]:
         all_results = []
+        
+        vector_filter = {"chat_id": str(chat_id)} if chat_id else None
         
         # Query for each concept
         for concept in concepts:
             # 1. Dense similarity vector search
-            candidates_vector = self.vector_store.similarity_search_with_score(concept, k=top_k)
+            candidates_vector = self.vector_store.similarity_search_with_score(concept, k=top_k, filter=vector_filter)
             
             # 2. Lexical keyword BM25 search
-            candidates_bm25 = self.bm25_index.score(concept, top_k=top_k)
+            candidates_bm25 = self.bm25_index.score(concept, top_k=top_k, chat_id=chat_id)
             
             # 3. Reciprocal Rank Fusion (RRF) merge
             merged = {}

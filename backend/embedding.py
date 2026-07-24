@@ -70,7 +70,7 @@ if __name__ == "__main__":
     
     processed_folder = "data/processed"
     vector_db_path = os.getenv("VECTOR_DB_PATH", "vector_db/")
-    embed_model = os.getenv("EMBEDDING_MODEL", "mxbai-embed-large")
+    embed_model = os.getenv("EMBEDDING_MODEL", "nomic-embed-text")
     
     if not os.path.exists(processed_folder):
         print(f"[ERROR] Directory '{processed_folder}' does not exist.")

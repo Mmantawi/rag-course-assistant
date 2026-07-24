@@ -74,7 +74,7 @@ class BM25Index:
             # Standard BM25 IDF formulation with smoothing
             self.idf[term] = math.log((self.num_docs - doc_freq + 0.5) / (doc_freq + 0.5) + 1.0)
 
-    def score(self, query: str, top_k: int = 10) -> list[tuple[Document, float]]:
+    def score(self, query: str, top_k: int = 10, chat_id: str = None) -> list[tuple[Document, float]]:
         """
         Calculates BM25 score for the query against all documents in the corpus.
         Returns the top_k matching Documents with their BM25 scores.
@@ -85,6 +85,11 @@ class BM25Index:
 
         scores = []
         for chunk_id, doc in self.corpus.items():
+            if chat_id:
+                doc_chat_id = doc.metadata.get("chat_id")
+                if not doc_chat_id or str(doc_chat_id) != str(chat_id):
+                    continue
+                    
             score = 0.0
             doc_len = self.doc_lengths[chunk_id]
             tf_dict = self.doc_tfs[chunk_id]

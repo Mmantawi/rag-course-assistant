@@ -8,8 +8,5 @@ export HOST=127.0.0.1
 export PORT=8000
 python main.py &
 
-# Start Streamlit frontend
-streamlit run frontend/streamlit_app.py --server.port 8501 --server.address 127.0.0.1 &
-
 # Start Nginx in foreground to keep container running
 nginx -g "daemon off;"

@@ -10,8 +10,9 @@ import bcrypt
 from typing import Optional, List
 from pydantic import BaseModel, EmailStr
 from sqlalchemy.orm import Session
-from fastapi import FastAPI, UploadFile, File, HTTPException, status, Depends, BackgroundTasks
-from fastapi.responses import FileResponse, StreamingResponse
+from fastapi import FastAPI, UploadFile, File, Form, HTTPException, status, Depends, BackgroundTasks
+from fastapi.responses import FileResponse, StreamingResponse, HTMLResponse
+from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 
@@ -42,6 +43,18 @@ try:
     from langchain_ollama import ChatOllama
 except ImportError:
     from langchain_community.chat_models import ChatOllama
+
+# Create database tables if they do not exist
+Base.metadata.create_all(bind=engine)
+
+# Ensure chat_id column exists in uploaded_documents table (PostgreSQL schema migration)
+try:
+    from sqlalchemy import text
+    with engine.connect() as conn:
+        conn.execute(text("ALTER TABLE uploaded_documents ADD COLUMN IF NOT EXISTS chat_id UUID REFERENCES chats(id) ON DELETE CASCADE;"))
+        conn.commit()
+except Exception as e:
+    print(f"[DB migration warning] Failed to check/add chat_id column: {e}", file=sys.stderr)
 
 # Initialize FastAPI App
 app = FastAPI(
@@ -89,6 +102,26 @@ def get_current_user_id(credentials: HTTPAuthorizationCredentials = Depends(secu
             detail="Could not validate credentials / Token expired",
             headers={"WWW-Authenticate": "Bearer"},
         )
+
+def get_formatted_chat_history(db: Session, chat_uuid: uuid.UUID, limit: int = 3) -> str:
+    """
+    Retrieves the last N messages of a chat session from PostgreSQL,
+    excluding the current user message (by using offset=1 because it was just saved).
+    Formats them into a plain-text prompt-friendly representation.
+    """
+    recent_msgs = db.query(Message).filter(Message.chat_id == chat_uuid).order_by(Message.created_at.desc()).offset(1).limit(limit).all()
+    if not recent_msgs:
+        return "No previous conversation history."
+    
+    # Chronological sort
+    recent_msgs.reverse()
+    
+    formatted_lines = []
+    for msg in recent_msgs:
+        role_label = "User" if msg.role == "user" else "Assistant"
+        formatted_lines.append(f"{role_label}: {msg.content}")
+        
+    return "\n".join(formatted_lines)
 
 # Pydantic Schemas
 class UserRegister(BaseModel):
@@ -222,6 +255,30 @@ async def create_chat(payload: ChatCreate, db: Session = Depends(get_db), curren
         "created_at": new_chat.created_at.isoformat()
     }
 
+@app.put("/chats/{chat_id}")
+async def update_chat_title(chat_id: str, payload: ChatCreate, db: Session = Depends(get_db), current_user_id: str = Depends(get_current_user_id)):
+    """Updates the title of a specific chat session for the current user."""
+    chat = db.query(Chat).filter(Chat.id == uuid.UUID(chat_id), Chat.user_id == uuid.UUID(current_user_id)).first()
+    if not chat:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Chat session not found or unauthorized access."
+        )
+    if not payload.title or not payload.title.strip():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Title cannot be empty."
+        )
+    chat.title = payload.title.strip()
+    chat.updated_at = datetime.datetime.utcnow()
+    db.commit()
+    db.refresh(chat)
+    return {
+        "id": str(chat.id),
+        "title": chat.title,
+        "updated_at": chat.updated_at.isoformat()
+    }
+
 @app.delete("/chats/{chat_id}")
 async def delete_chat(chat_id: str, db: Session = Depends(get_db), current_user_id: str = Depends(get_current_user_id)):
     chat = db.query(Chat).filter(Chat.id == uuid.UUID(chat_id), Chat.user_id == uuid.UUID(current_user_id)).first()
@@ -258,9 +315,13 @@ async def health_check():
     }
 
 @app.get("/documents", status_code=status.HTTP_200_OK)
-async def list_documents(db: Session = Depends(get_db), current_user_id: str = Depends(get_current_user_id)):
-    """Lists all PDF documents currently stored and indexed in PostgreSQL for the current user."""
-    docs = db.query(UploadedDocument).filter(UploadedDocument.user_id == uuid.UUID(current_user_id)).order_by(UploadedDocument.uploaded_at.desc()).all()
+async def list_documents(chat_id: Optional[str] = None, db: Session = Depends(get_db), current_user_id: str = Depends(get_current_user_id)):
+    """Lists all PDF documents currently stored and indexed in PostgreSQL for the current user, optionally filtered by chat session."""
+    query = db.query(UploadedDocument).filter(UploadedDocument.user_id == uuid.UUID(current_user_id))
+    if chat_id:
+        query = query.filter(UploadedDocument.chat_id == uuid.UUID(chat_id))
+    
+    docs = query.order_by(UploadedDocument.uploaded_at.desc()).all()
     return {
         "documents": [
             {
@@ -269,18 +330,34 @@ async def list_documents(db: Session = Depends(get_db), current_user_id: str = D
                 "storage_path": d.storage_path,
                 "file_size": d.file_size,
                 "status": d.status,
-                "uploaded_at": d.uploaded_at.isoformat()
+                "uploaded_at": d.uploaded_at.isoformat(),
+                "chat_id": str(d.chat_id) if d.chat_id else None
             } for d in docs
         ]
     }
 
 @app.get("/pdf/{filename}")
-async def get_pdf(filename: str, db: Session = Depends(get_db), current_user_id: str = Depends(get_current_user_id)):
+async def get_pdf(filename: str, token: str = None, db: Session = Depends(get_db)):
     """Serves a raw PDF file from the local storage folder to display it in browser tab."""
-    # Authenticate file access
+    # Authenticate file access via query token
+    if not token:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Authentication token required."
+        )
+        
+    try:
+        payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
+        user_id_str = payload["user_id"]
+    except Exception:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or expired token."
+        )
+
     doc = db.query(UploadedDocument).filter(
         UploadedDocument.filename == filename,
-        UploadedDocument.user_id == uuid.UUID(current_user_id)
+        UploadedDocument.user_id == uuid.UUID(user_id_str)
     ).first()
     if not doc:
         raise HTTPException(
@@ -291,7 +368,7 @@ async def get_pdf(filename: str, db: Session = Depends(get_db), current_user_id:
     if not os.path.exists(doc.storage_path):
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Physical file missing on server."
+            detail="Physical file missing on server."
         )
     return FileResponse(doc.storage_path, media_type="application/pdf")
 
@@ -299,6 +376,7 @@ async def get_pdf(filename: str, db: Session = Depends(get_db), current_user_id:
 async def upload_documents(
     background_tasks: BackgroundTasks,
     files: list[UploadFile] = File(...),
+    chat_id: Optional[str] = Form(None),
     db: Session = Depends(get_db),
     current_user_id: str = Depends(get_current_user_id)
 ):
@@ -337,13 +415,16 @@ async def upload_documents(
                     filename=file.filename,
                     storage_path=file_path,
                     file_size=len(content),
-                    status="uploaded"
+                    status="uploaded",
+                    chat_id=uuid.UUID(chat_id) if chat_id else None
                 )
                 db.add(new_doc)
             else:
                 existing_doc.status = "uploaded"
                 existing_doc.file_size = len(content)
                 existing_doc.uploaded_at = datetime.datetime.utcnow()
+                if chat_id:
+                    existing_doc.chat_id = uuid.UUID(chat_id)
                 
             db.commit()
             saved_filenames.append(file.filename)
@@ -380,16 +461,20 @@ async def chat(request: ChatRequest, db: Session = Depends(get_db), current_user
     db.commit()
 
     try:
+        chat_history = get_formatted_chat_history(db, chat_uuid, limit=3)
         result = run_rag_pipeline(
             question=request.question,
             db_path=VECTOR_DB_PATH,
             embedding_model=EMBEDDING_MODEL,
             llm_model=request.model_choice,
-            top_k=TOP_K
+            top_k=TOP_K,
+            chat_history=chat_history,
+            chat_id=chat_uuid
         )
         
         # Save assistant response
-        assistant_msg = Message(chat_id=chat_uuid, content=result["answer"], role="assistant")
+        citations_suffix = f"\n\n<!-- CITATIONS: {json.dumps(result['sources'])} -->"
+        assistant_msg = Message(chat_id=chat_uuid, content=result["answer"] + citations_suffix, role="assistant")
         db.add(assistant_msg)
         chat.updated_at = datetime.datetime.utcnow()
         db.commit()
@@ -424,6 +509,9 @@ async def chat_stream(request: ChatRequest, db: Session = Depends(get_db), curre
     db.add(user_msg)
     db.commit()
 
+    # Extract chat history before starting async generator
+    chat_history = get_formatted_chat_history(db, chat_uuid, limit=3)
+
     async def event_generator():
         try:
             # 1. Retrieve relevant chunks first
@@ -431,7 +519,8 @@ async def chat_stream(request: ChatRequest, db: Session = Depends(get_db), curre
                 question=request.question,
                 db_path=VECTOR_DB_PATH,
                 embedding_model=EMBEDDING_MODEL,
-                top_k=TOP_K
+                top_k=TOP_K,
+                chat_id=chat_uuid
             )
             
             # 2. Extract contents and sources metadata
@@ -457,7 +546,11 @@ async def chat_stream(request: ChatRequest, db: Session = Depends(get_db), curre
             
             # 3. Stream from selected model
             combined_context = "\n\n".join(context_snippets)
-            formatted_prompt = RAG_PROMPT.format(context=combined_context, question=request.question)
+            formatted_prompt = RAG_PROMPT.format(
+                context=combined_context,
+                chat_history=chat_history,
+                question=request.question
+            )
             
             from backend.generator import get_llm
             llm = get_llm(request.model_choice)
@@ -471,7 +564,8 @@ async def chat_stream(request: ChatRequest, db: Session = Depends(get_db), curre
             if full_response.strip():
                 db_bg = SessionLocal()
                 try:
-                    assistant_msg = Message(chat_id=chat_uuid, content=full_response, role="assistant")
+                    citations_suffix = f"\n\n<!-- CITATIONS: {json.dumps(sources)} -->"
+                    assistant_msg = Message(chat_id=chat_uuid, content=full_response + citations_suffix, role="assistant")
                     db_bg.add(assistant_msg)
                     db_bg.query(Chat).filter(Chat.id == chat_uuid).update({"updated_at": datetime.datetime.utcnow()})
                     db_bg.commit()
@@ -497,6 +591,14 @@ async def delete_documents(db: Session = Depends(get_db), current_user_id: str =
     user_docs = db.query(UploadedDocument).filter(UploadedDocument.user_id == user_uuid).all()
     
     for doc in user_docs:
+        # Delete physical images from disk
+        for img in doc.images:
+            if os.path.exists(img.image_path):
+                try:
+                    os.remove(img.image_path)
+                except Exception:
+                    pass
+
         # Delete raw PDF
         if os.path.exists(doc.storage_path):
             try:
@@ -512,6 +614,14 @@ async def delete_documents(db: Session = Depends(get_db), current_user_id: str =
                 os.remove(txt_path)
             except Exception as e:
                 errors.append(f"Failed to delete processed file '{txt_path}': {e}")
+
+    # Reset parent document store
+    try:
+        from backend.parent_store import ParentStore
+        parent_store = ParentStore(VECTOR_DB_PATH)
+        parent_store.clear()
+    except Exception as e:
+        errors.append(f"Failed to clear ParentStore: {e}")
 
     # Remove records from PostgreSQL
     try:
@@ -552,3 +662,128 @@ async def delete_documents(db: Session = Depends(get_db), current_user_id: str =
         )
         
     return {"message": "All documents successfully deleted and database index reset."}
+
+
+@app.delete("/documents/{doc_id}")
+async def delete_single_document(doc_id: str, db: Session = Depends(get_db), current_user_id: str = Depends(get_current_user_id)):
+    """
+    Deletes a specific uploaded PDF, its processed text file, and removes its chunks from ChromaDB and BM25.
+    """
+    try:
+        doc_uuid = uuid.UUID(doc_id)
+    except ValueError:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid document ID format.")
+
+    user_uuid = uuid.UUID(current_user_id)
+    doc = db.query(UploadedDocument).filter(UploadedDocument.id == doc_uuid, UploadedDocument.user_id == user_uuid).first()
+    
+    if not doc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Document not found or unauthorized access.")
+        
+    errors = []
+    filename = doc.filename
+    storage_path = doc.storage_path
+    
+    # 1. Delete physical slide images from disk
+    for img in doc.images:
+        if os.path.exists(img.image_path):
+            try:
+                os.remove(img.image_path)
+            except Exception:
+                pass
+
+    # 2. Delete physical raw PDF
+    if os.path.exists(storage_path):
+        try:
+            os.remove(storage_path)
+        except Exception as e:
+            errors.append(f"Failed to delete PDF from disk: {e}")
+            
+    # 3. Delete corresponding processed text file
+    txt_filename = os.path.splitext(filename)[0] + ".txt"
+    txt_path = os.path.join(PROCESSED_FOLDER, txt_filename)
+    if os.path.exists(txt_path):
+        try:
+            os.remove(txt_path)
+        except Exception as e:
+            errors.append(f"Failed to delete processed text file from disk: {e}")
+
+    # 4. Delete parent documents from ParentStore
+    try:
+        from backend.parent_store import ParentStore
+        parent_store = ParentStore(VECTOR_DB_PATH)
+        parent_store.delete_by_document(filename)
+    except Exception as e:
+        errors.append(f"Failed to delete ParentStore records: {e}")
+            
+    # 5. Remove chunks from ChromaDB
+    try:
+        from langchain_ollama import OllamaEmbeddings
+        from langchain_community.vectorstores import Chroma
+        
+        embeddings = OllamaEmbeddings(model=EMBEDDING_MODEL)
+        vector_store = Chroma(
+            collection_name="pdf_rag_collection",
+            embedding_function=embeddings,
+            persist_directory=VECTOR_DB_PATH
+        )
+        # Delete from Chroma using metadata filter
+        vector_store.delete(where={"source": filename})
+    except Exception as e:
+        errors.append(f"Failed to delete chunks from ChromaDB: {e}")
+
+    # 6. Remove from PostgreSQL
+    try:
+        db.delete(doc)
+        db.commit()
+    except Exception as e:
+        errors.append(f"Failed to remove document record from database: {e}")
+
+    # 5. Rebuild the BM25 Index
+    try:
+        from backend.bm25 import BM25Index
+        from backend.chunker import chunk_text
+        
+        all_docs = []
+        if os.path.exists(PROCESSED_FOLDER):
+            txt_files = [f for f in os.listdir(PROCESSED_FOLDER) if f.endswith(".txt")]
+            for txt_file in txt_files:
+                path = os.path.join(PROCESSED_FOLDER, txt_file)
+                try:
+                    docs = chunk_text(path)
+                    all_docs.extend(docs)
+                except Exception as e:
+                    print(f"[WARNING] Failed to parse {txt_file} for BM25: {e}")
+                    
+        bm25_index = BM25Index()
+        bm25_path = os.path.join(VECTOR_DB_PATH, "bm25_index.pkl")
+        if all_docs:
+            bm25_index.fit(all_docs)
+            bm25_index.save(bm25_path)
+        else:
+            # No files left, clean up index pkl
+            if os.path.exists(bm25_path):
+                os.remove(bm25_path)
+    except Exception as e:
+        errors.append(f"Failed to rebuild BM25 Index: {e}")
+        
+    if errors:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail={"message": "Partial deletion failures occurred.", "errors": errors}
+        )
+        
+    return {"message": f"Document '{filename}' successfully deleted and indexes updated."}
+
+
+# --- Serve React Frontend SPA ---
+@app.get("/", response_class=HTMLResponse)
+async def read_index():
+    index_path = os.path.join("frontend", "index.html")
+    if os.path.exists(index_path):
+        with open(index_path, "r", encoding="utf-8") as f:
+            return HTMLResponse(content=f.read(), status_code=200)
+    return HTMLResponse(content="<h3>React frontend (frontend/index.html) not found.</h3>", status_code=404)
+
+# Serve static folder from the frontend directory
+app.mount("/frontend", StaticFiles(directory="frontend"), name="frontend")

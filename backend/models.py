@@ -58,5 +58,23 @@ class UploadedDocument(Base):
     status = Column(String(50), default="uploaded", nullable=False)  # uploaded, processing, ready, failed
     uploaded_at = Column(DateTime, default=datetime.utcnow, nullable=False)
 
+    chat_id = Column(UUID(as_uuid=True), ForeignKey("chats.id", ondelete="CASCADE"), nullable=True)
+
     # Relationships
     user = relationship("User", back_populates="documents")
+    images = relationship("UploadedImage", back_populates="document", cascade="all, delete-orphan")
+
+
+class UploadedImage(Base):
+    __tablename__ = "images"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    document_id = Column(UUID(as_uuid=True), ForeignKey("uploaded_documents.id", ondelete="CASCADE"), nullable=False)
+    page_number = Column(Integer, nullable=False)
+    image_number = Column(Integer, nullable=False)
+    image_path = Column(String(500), nullable=False)
+    caption = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+    # Relationships
+    document = relationship("UploadedDocument", back_populates="images")

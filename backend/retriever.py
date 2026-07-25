@@ -133,7 +133,7 @@ if __name__ == "__main__":
     
     # Read settings from environment variables
     vector_db_path = os.getenv("VECTOR_DB_PATH", "vector_db/")
-    embed_model = os.getenv("EMBEDDING_MODEL", "nomic-embed-text")
+    embed_model = os.getenv("EMBEDDING_MODEL", "mxbai-embed-large")
     default_top_k = int(os.getenv("TOP_K", 5))
     
     # Use command-line arguments as the test question, or default to a slide topic

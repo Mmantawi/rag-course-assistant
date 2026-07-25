@@ -34,3 +34,4 @@ vector_db/*
 *.pkl
 *.log
 data/pdfs_backup/
+uploads/

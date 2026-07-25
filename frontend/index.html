@@ -122,6 +122,7 @@
             const [activeChatId, setActiveChatId] = useState(null);
             const [messages, setMessages] = useState([]);
             const [documents, setDocuments] = useState([]);
+            const [allDocuments, setAllDocuments] = useState([]);
             const [systemHealth, setSystemHealth] = useState(null);
             const [isConnected, setIsConnected] = useState(false);
             
@@ -162,6 +163,7 @@
                     setActiveChatId(null);
                     setMessages([]);
                     setDocuments([]);
+                    setAllDocuments([]);
                     setSourcesHistory([]);
                 }
             }, [token]);
@@ -322,17 +324,31 @@
             };
 
             const fetchDocuments = async () => {
-                if (!activeChatId) {
-                    setDocuments([]);
-                    return;
-                }
+                if (!token) return;
                 try {
-                    const res = await fetch(`/documents?chat_id=${activeChatId}`, {
+                    // Fetch all documents for the whole account
+                    const resAll = await fetch('/documents', {
                         headers: { 'Authorization': `Bearer ${token}` }
                     });
-                    if (!res.ok) return handleApiError(res);
-                    const data = await res.json();
-                    setDocuments(data.documents || []);
+                    if (resAll.ok) {
+                        const dataAll = await resAll.json();
+                        setAllDocuments(dataAll.documents || []);
+                    }
+
+                    // Fetch documents for the active chat session
+                    if (activeChatId) {
+                        const res = await fetch(`/documents?chat_id=${activeChatId}`, {
+                            headers: { 'Authorization': `Bearer ${token}` }
+                        });
+                        if (res.ok) {
+                            const data = await res.json();
+                            setDocuments(data.documents || []);
+                        } else {
+                            handleApiError(res);
+                        }
+                    } else {
+                        setDocuments([]);
+                    }
                 } catch (err) {
                     console.error("Fetch documents failed:", err);
                 }
@@ -467,6 +483,9 @@
                             // Automatically recreate a fresh chat session
                             handleCreateChat("Chat Session 1");
                         }
+                    } else {
+                        // Refresh documents to update account-wide stats since the deleted chat's documents are gone
+                        fetchDocuments();
                     }
                 } catch (err) {
                     console.error("Delete chat failed:", err);
@@ -654,7 +673,8 @@
             };
 
             // Calculate overall document size stats
-            const totalDocsSizeMB = (documents.reduce((acc, doc) => acc + doc.file_size, 0) / (1024 * 1024)).toFixed(2);
+            const sessionDocsSizeMB = (documents.reduce((acc, doc) => acc + doc.file_size, 0) / (1024 * 1024)).toFixed(2);
+            const totalDocsSizeMB = (allDocuments.reduce((acc, doc) => acc + doc.file_size, 0) / (1024 * 1024)).toFixed(2);
             
             // ==========================================================================
             // RENDER AUTHENTICATION CONTAINER
@@ -775,88 +795,86 @@
                                 <span>Document Manager</span>
                             </div>
 
-                            {(activeTab === 'chat' || activeTab === 'documents') && (
-                                <div style={{marginTop: '20px'}}>
-                                    <div style={{fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted)', padding: '0 12px 8px 12px'}}>
-                                        Chat Sessions
-                                    </div>
-                                    <button className="signout-btn" style={{width: '100%', marginBottom: '10px'}} onClick={() => handleCreateChat(`Chat ${chats.length + 1}`)}>
-                                        <Icons.Plus /> New Session
-                                    </button>
-                                    <div style={{display: 'flex', flexDirection: 'column', gap: '4px', maxHeight: '200px', overflowY: 'auto'}}>
-                                        {chats.map(c => {
-                                            const isActive = c.id === activeChatId;
-                                            const isEditing = c.id === editingChatId;
-                                            return (
-                                                <div 
-                                                    key={c.id} 
-                                                    className={`sidebar-item`} 
-                                                    style={{
-                                                        padding: '8px 12px', 
-                                                        background: isActive ? 'var(--bg-tertiary)' : 'transparent',
-                                                        color: isActive ? 'var(--text-primary)' : 'var(--text-secondary)',
-                                                        fontSize: '0.85rem',
-                                                        justifyContent: 'space-between'
-                                                    }}
-                                                    onClick={() => {
-                                                        if (!isEditing) handleChatSelect(c.id);
-                                                    }}
-                                                >
-                                                    {isEditing ? (
-                                                        <input
-                                                            type="text"
-                                                            value={editingTitle}
-                                                            onChange={(e) => setEditingTitle(e.target.value)}
-                                                            onBlur={() => handleSaveTitle(c.id)}
-                                                            onKeyDown={(e) => {
-                                                                if (e.key === 'Enter') handleSaveTitle(c.id);
-                                                                if (e.key === 'Escape') setEditingChatId(null);
-                                                            }}
-                                                            autoFocus
-                                                            onClick={(e) => e.stopPropagation()}
-                                                            style={{
-                                                                background: 'rgba(255, 255, 255, 0.1)',
-                                                                border: '1px solid rgba(255, 255, 255, 0.2)',
-                                                                borderRadius: '4px',
-                                                                color: 'var(--text-primary)',
-                                                                padding: '2px 4px',
-                                                                fontSize: '0.85rem',
-                                                                width: '80%',
-                                                                outline: 'none'
-                                                            }}
-                                                        />
-                                                    ) : (
-                                                        <span 
-                                                            onClick={(e) => {
-                                                                if (isActive) {
-                                                                    e.stopPropagation();
-                                                                    setEditingChatId(c.id);
-                                                                    setEditingTitle(c.title);
-                                                                }
-                                                            }}
-                                                            onDoubleClick={(e) => {
+                            <div style={{marginTop: '20px'}}>
+                                <div style={{fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted)', padding: '0 12px 8px 12px'}}>
+                                    Chat Sessions
+                                </div>
+                                <button className="signout-btn" style={{width: '100%', marginBottom: '10px'}} onClick={() => handleCreateChat(`Chat ${chats.length + 1}`)}>
+                                    <Icons.Plus /> New Session
+                                </button>
+                                <div style={{display: 'flex', flexDirection: 'column', gap: '4px', maxHeight: 'calc(100vh - 380px)', overflowY: 'auto'}}>
+                                    {chats.map(c => {
+                                        const isActive = c.id === activeChatId;
+                                        const isEditing = c.id === editingChatId;
+                                        return (
+                                            <div 
+                                                key={c.id} 
+                                                className={`sidebar-item`} 
+                                                style={{
+                                                    padding: '8px 12px', 
+                                                    background: isActive ? 'var(--bg-tertiary)' : 'transparent',
+                                                    color: isActive ? 'var(--text-primary)' : 'var(--text-secondary)',
+                                                    fontSize: '0.85rem',
+                                                    justifyContent: 'space-between'
+                                                }}
+                                                onClick={() => {
+                                                    if (!isEditing) handleChatSelect(c.id);
+                                                }}
+                                            >
+                                                {isEditing ? (
+                                                    <input
+                                                        type="text"
+                                                        value={editingTitle}
+                                                        onChange={(e) => setEditingTitle(e.target.value)}
+                                                        onBlur={() => handleSaveTitle(c.id)}
+                                                        onKeyDown={(e) => {
+                                                            if (e.key === 'Enter') handleSaveTitle(c.id);
+                                                            if (e.key === 'Escape') setEditingChatId(null);
+                                                        }}
+                                                        autoFocus
+                                                        onClick={(e) => e.stopPropagation()}
+                                                        style={{
+                                                            background: 'rgba(255, 255, 255, 0.1)',
+                                                            border: '1px solid rgba(255, 255, 255, 0.2)',
+                                                            borderRadius: '4px',
+                                                            color: 'var(--text-primary)',
+                                                            padding: '2px 4px',
+                                                            fontSize: '0.85rem',
+                                                            width: '80%',
+                                                            outline: 'none'
+                                                        }}
+                                                    />
+                                                ) : (
+                                                    <span 
+                                                        onClick={(e) => {
+                                                            if (isActive) {
                                                                 e.stopPropagation();
                                                                 setEditingChatId(c.id);
                                                                 setEditingTitle(c.title);
-                                                            }}
-                                                            style={{overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '80%', cursor: 'pointer'}}
-                                                            title="Click active title or double-click to rename"
-                                                        >
-                                                            💬 {c.title}
-                                                        </span>
-                                                    )}
-                                                    <button 
-                                                        style={{background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer'}}
-                                                        onClick={(e) => handleDeleteChat(e, c.id)}
+                                                            }
+                                                        }}
+                                                        onDoubleClick={(e) => {
+                                                            e.stopPropagation();
+                                                            setEditingChatId(c.id);
+                                                            setEditingTitle(c.title);
+                                                        }}
+                                                        style={{overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '80%', cursor: 'pointer'}}
+                                                        title="Click active title or double-click to rename"
                                                     >
-                                                        <Icons.Trash />
-                                                    </button>
-                                                </div>
-                                            );
-                                        })}
-                                    </div>
+                                                        💬 {c.title}
+                                                    </span>
+                                                )}
+                                                <button 
+                                                    style={{background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer'}}
+                                                    onClick={(e) => handleDeleteChat(e, c.id)}
+                                                >
+                                                    <Icons.Trash />
+                                                </button>
+                                            </div>
+                                        );
+                                    })}
                                 </div>
-                            )}
+                            </div>
                         </div>
 
                         <div className="sidebar-user">
@@ -1057,37 +1075,103 @@
                                 ========================================================== */}
                             {activeTab === 'dashboard' && (
                                 <div>
-                                    {/* KPI Stats cards */}
-                                    <div className="dashboard-grid">
-                                        <div className="kpi-card">
-                                            <div className="kpi-icon-wrapper">
-                                                <Icons.Document />
+                                    {/* Account Dashboard */}
+                                    <div style={{marginBottom: '32px'}}>
+                                        <h3 style={{fontSize: '1.2rem', fontWeight: 700, marginBottom: '16px', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '8px'}}>
+                                            <span style={{color: 'var(--accent)', fontSize: '1.4rem'}}>📊</span> System Dashboard (Whole Account)
+                                        </h3>
+                                        <div className="dashboard-grid">
+                                            <div className="kpi-card">
+                                                <div className="kpi-icon-wrapper" style={{background: 'rgba(99, 102, 241, 0.12)', color: 'var(--accent)'}}>
+                                                    <Icons.Document />
+                                                </div>
+                                                <div className="kpi-content">
+                                                    <span className="kpi-label">Total Index Documents</span>
+                                                    <span className="kpi-value">{allDocuments.length}</span>
+                                                </div>
                                             </div>
-                                            <div className="kpi-content">
-                                                <span className="kpi-label">Indexed Documents</span>
-                                                <span className="kpi-value">{documents.length}</span>
-                                            </div>
-                                        </div>
 
-                                        <div className="kpi-card">
-                                            <div className="kpi-icon-wrapper">
-                                                <Icons.Folder />
+                                            <div className="kpi-card">
+                                                <div className="kpi-icon-wrapper" style={{background: 'rgba(99, 102, 241, 0.12)', color: 'var(--accent)'}}>
+                                                    <Icons.Folder />
+                                                </div>
+                                                <div className="kpi-content">
+                                                    <span className="kpi-label">Total Disk Storage</span>
+                                                    <span className="kpi-value">{totalDocsSizeMB} MB</span>
+                                                </div>
                                             </div>
-                                            <div className="kpi-content">
-                                                <span className="kpi-label">Disk Storage</span>
-                                                <span className="kpi-value">{totalDocsSizeMB} MB</span>
-                                            </div>
-                                        </div>
 
-                                        <div className="kpi-card">
-                                            <div className="kpi-icon-wrapper">
-                                                <Icons.Chat />
-                                            </div>
-                                            <div className="kpi-content">
-                                                <span className="kpi-label">Chat Sessions</span>
-                                                <span className="kpi-value">{chats.length}</span>
+                                            <div className="kpi-card">
+                                                <div className="kpi-icon-wrapper" style={{background: 'rgba(99, 102, 241, 0.12)', color: 'var(--accent)'}}>
+                                                    <Icons.Chat />
+                                                </div>
+                                                <div className="kpi-content">
+                                                    <span className="kpi-label">Chat Sessions</span>
+                                                    <span className="kpi-value">{chats.length}</span>
+                                                </div>
                                             </div>
                                         </div>
+                                    </div>
+
+                                    {/* Session Dashboard */}
+                                    <div style={{marginBottom: '32px'}}>
+                                        <h3 style={{fontSize: '1.2rem', fontWeight: 700, marginBottom: '16px', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '8px'}}>
+                                            <span style={{color: '#10b981', fontSize: '1.4rem'}}>💬</span> Session Dashboard (Active Session)
+                                        </h3>
+                                        {activeChatId ? (
+                                            <div>
+                                                <div style={{
+                                                    fontSize: '0.85rem', 
+                                                    color: 'var(--text-secondary)', 
+                                                    marginBottom: '16px', 
+                                                    background: 'var(--bg-secondary)', 
+                                                    padding: '8px 16px', 
+                                                    borderRadius: '8px',
+                                                    border: '1px solid var(--border-color)',
+                                                    display: 'inline-flex',
+                                                    alignItems: 'center',
+                                                    gap: '8px'
+                                                }}>
+                                                    <span style={{width: '8px', height: '8px', borderRadius: '50%', background: '#10b981', display: 'inline-block'}}></span>
+                                                    Active Session: <strong style={{color: 'var(--text-primary)'}}>{chats.find(c => c.id === activeChatId)?.title || 'Unnamed Session'}</strong>
+                                                </div>
+                                                <div className="dashboard-grid">
+                                                    <div className="kpi-card" style={{borderColor: 'rgba(16, 185, 129, 0.2)'}}>
+                                                        <div className="kpi-icon-wrapper" style={{background: 'rgba(16, 185, 129, 0.12)', color: '#10b981'}}>
+                                                            <Icons.Document />
+                                                        </div>
+                                                        <div className="kpi-content">
+                                                            <span className="kpi-label">Indexed Documents</span>
+                                                            <span className="kpi-value">{documents.length}</span>
+                                                        </div>
+                                                    </div>
+
+                                                    <div className="kpi-card" style={{borderColor: 'rgba(16, 185, 129, 0.2)'}}>
+                                                        <div className="kpi-icon-wrapper" style={{background: 'rgba(16, 185, 129, 0.12)', color: '#10b981'}}>
+                                                            <Icons.Folder />
+                                                        </div>
+                                                        <div className="kpi-content">
+                                                            <span className="kpi-label">Disk Storage</span>
+                                                            <span className="kpi-value">{sessionDocsSizeMB} MB</span>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        ) : (
+                                            <div style={{
+                                                padding: '20px', 
+                                                background: 'var(--bg-secondary)', 
+                                                borderRadius: '12px', 
+                                                border: '1px solid var(--border-color)',
+                                                color: 'var(--text-secondary)',
+                                                fontSize: '0.9rem',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                gap: '10px'
+                                            }}>
+                                                <span>⚠️</span> No active chat session selected. Select or create one from the sidebar.
+                                            </div>
+                                        )}
                                     </div>
 
                                     {/* Lower details split */}
@@ -1116,8 +1200,6 @@
                                                 <p>BM25 term calculations are loaded and fitted over active document chunks.</p>
                                             </div>
                                         </div>
-
-
 
                                     </div>
                                 </div>
